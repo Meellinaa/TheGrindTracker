@@ -47,8 +47,8 @@ export const Route = createFileRoute("/")({
         content:
           "A dopamine-charged dashboard to track job openings, closings, resume readiness, and application progress across 120+ target companies.",
       },
-      { property: "og:title", content: "Job Hunt HQ" },
-      { property: "og:description", content: "Track openings, closings, and resume readiness with style." },
+      { property: "og:title", content: "Job Hunt HQ — Track Applications & Resumes" },
+      { property: "og:description", content: "A dopamine-charged dashboard to track job openings, closings, resume readiness, and application progress across 120+ target companies." },
     ],
   }),
 });

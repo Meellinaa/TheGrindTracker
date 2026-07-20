@@ -77,12 +77,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Job Hunt HQ" },
-      { name: "description", content: "Track job openings, closings, and resume readiness across your target companies." },
-      { property: "og:title", content: "Job Hunt HQ" },
-      { property: "og:description", content: "A dopamine-charged job application tracker." },
+      { title: "Job Hunt HQ — Track Applications & Resumes" },
+      { name: "description", content: "A dopamine-charged dashboard to track job openings, closings, resume readiness, and application progress across 120+ target companies." },
+      { property: "og:title", content: "Job Hunt HQ — Track Applications & Resumes" },
+      { property: "og:description", content: "A dopamine-charged dashboard to track job openings, closings, resume readiness, and application progress across 120+ target companies." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Job Hunt HQ — Track Applications & Resumes" },
+      { name: "twitter:description", content: "A dopamine-charged dashboard to track job openings, closings, resume readiness, and application progress across 120+ target companies." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/011d0625-e409-4d26-bcd1-f7fd230a8ec9/id-preview-376df024--9d8420e2-6bd7-4e75-a186-2210433657d8.lovable.app-1784565298341.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/011d0625-e409-4d26-bcd1-f7fd230a8ec9/id-preview-376df024--9d8420e2-6bd7-4e75-a186-2210433657d8.lovable.app-1784565298341.png" },
     ],
     links: [
       {
