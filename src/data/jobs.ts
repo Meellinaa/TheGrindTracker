@@ -5,6 +5,7 @@ export type Job = {
   roles: string;
   link: string;
   notes: string;
+  country?: string;
 };
 
 const raw: Array<Omit<Job, "id">> = [
