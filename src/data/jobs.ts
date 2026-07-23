@@ -136,6 +136,7 @@ const raw: Array<Omit<Job, "id">> = [
 
 export const JOBS: Job[] = raw.map((j) => ({
   ...j,
+  country: "Canada",
   id: j.company.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
 }));
 
