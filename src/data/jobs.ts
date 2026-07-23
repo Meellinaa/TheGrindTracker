@@ -5,6 +5,7 @@ export type Job = {
   roles: string;
   link: string;
   notes: string;
+  country?: string;
 };
 
 const raw: Array<Omit<Job, "id">> = [
@@ -135,18 +136,19 @@ const raw: Array<Omit<Job, "id">> = [
 
 export const JOBS: Job[] = raw.map((j) => ({
   ...j,
+  country: "Canada",
   id: j.company.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
 }));
 
 export type AppStatus = "not-started" | "researching" | "applied" | "interview" | "offer" | "rejected";
 
 export const STATUS_META: Record<AppStatus, { label: string; color: string; emoji: string }> = {
-  "not-started": { label: "Not Started", color: "hsl(220 15% 55%)", emoji: "⚪" },
-  researching: { label: "Researching", color: "hsl(45 95% 55%)", emoji: "🔍" },
-  applied: { label: "Applied", color: "hsl(215 90% 60%)", emoji: "🚀" },
-  interview: { label: "Interview", color: "hsl(280 85% 65%)", emoji: "💬" },
-  offer: { label: "Offer", color: "hsl(145 70% 45%)", emoji: "🎉" },
-  rejected: { label: "Rejected", color: "hsl(0 70% 55%)", emoji: "💀" },
+  "not-started": { label: "Not Started", color: "oklch(0.78 0.03 320)", emoji: "🤍" },
+  researching: { label: "Researching", color: "oklch(0.85 0.11 85)", emoji: "🔍" },
+  applied: { label: "Applied", color: "oklch(0.82 0.09 230)", emoji: "💌" },
+  interview: { label: "Interview", color: "oklch(0.82 0.1 300)", emoji: "💬" },
+  offer: { label: "Offer", color: "oklch(0.82 0.11 155)", emoji: "🎀" },
+  rejected: { label: "Rejected", color: "oklch(0.78 0.1 25)", emoji: "🥀" },
 };
 
 export const CATEGORY_GROUPS: Record<string, string> = {
