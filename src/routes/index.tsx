@@ -37,10 +37,12 @@ import {
   Heart,
   CalendarDays,
   Plus,
-  Upload,
   Trash2,
   Globe,
   Clock,
+  Building2,
+  LayoutGrid,
+  Briefcase,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
