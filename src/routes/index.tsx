@@ -61,10 +61,19 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const STATUSES: AppStatus[] = ["not-started", "researching", "applied", "interview", "offer", "rejected"];
-
 function Dashboard() {
-  const { get, update, addCustomJob, removeCustomJob, customJobs, hydrated } = useJobTracker();
+  const {
+    get,
+    update,
+    addCustomJob,
+    removeCustomJob,
+    customJobs,
+    rolesOf,
+    rolesByJob,
+    addRole,
+    removeRole,
+    hydrated,
+  } = useJobTracker();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
@@ -72,17 +81,23 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [view, setView] = useState<"category" | "company">("category");
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
   const enriched = useMemo(
     () =>
-      allJobs.map((j) => ({
-        ...j,
-        group: j.id.startsWith("custom-") ? "💖 My Custom Adds" : groupOf(j.category),
-        state: get(j.id),
-      })),
-    [allJobs, get],
+      allJobs.map((j) => {
+        const roles = rolesByJob[j.id] ?? [];
+        return {
+          ...j,
+          group: j.id.startsWith("custom-") ? "💖 My Custom Adds" : groupOf(j.category),
+          state: get(j.id),
+          roles_tracked: roles,
+          roleStates: roles.map((r) => ({ role: r, state: get(roleKey(j.id, r.id)) })),
+        };
+      }),
+    [allJobs, get, rolesByJob],
   );
 
   const groups = useMemo(() => {
