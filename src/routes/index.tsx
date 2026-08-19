@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
-import { useJobTracker, type JobState, type ResumeFile } from "@/hooks/use-job-tracker";
+import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { DateField, LabeledInput, ResumeUploader, StatusButtons, STATUSES } from "@/components/track-fields";
+import { RolesSection } from "@/components/roles-section";
 import {
   Select,
   SelectContent,
