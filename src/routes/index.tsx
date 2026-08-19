@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
-import { useJobTracker, type JobState, type ResumeFile } from "@/hooks/use-job-tracker";
+import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { DateField, LabeledInput, ResumeUploader, StatusButtons, STATUSES } from "@/components/track-fields";
+import { RolesSection } from "@/components/roles-section";
 import {
   Select,
   SelectContent,
@@ -36,10 +37,12 @@ import {
   Heart,
   CalendarDays,
   Plus,
-  Upload,
   Trash2,
   Globe,
   Clock,
+  Building2,
+  LayoutGrid,
+  Briefcase,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -58,10 +61,19 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const STATUSES: AppStatus[] = ["not-started", "researching", "applied", "interview", "offer", "rejected"];
-
 function Dashboard() {
-  const { get, update, addCustomJob, removeCustomJob, customJobs, hydrated } = useJobTracker();
+  const {
+    get,
+    update,
+    addCustomJob,
+    removeCustomJob,
+    customJobs,
+    rolesOf,
+    rolesByJob,
+    addRole,
+    removeRole,
+    hydrated,
+  } = useJobTracker();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
@@ -69,17 +81,23 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [view, setView] = useState<"category" | "company">("category");
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
   const enriched = useMemo(
     () =>
-      allJobs.map((j) => ({
-        ...j,
-        group: j.id.startsWith("custom-") ? "💖 My Custom Adds" : groupOf(j.category),
-        state: get(j.id),
-      })),
-    [allJobs, get],
+      allJobs.map((j) => {
+        const roles = rolesByJob[j.id] ?? [];
+        return {
+          ...j,
+          group: j.id.startsWith("custom-") ? "💖 My Custom Adds" : groupOf(j.category),
+          state: get(j.id),
+          roles_tracked: roles,
+          roleStates: roles.map((r) => ({ role: r, state: get(roleKey(j.id, r.id)) })),
+        };
+      }),
+    [allJobs, get, rolesByJob],
   );
 
   const groups = useMemo(() => {
@@ -105,6 +123,7 @@ function Dashboard() {
         j.company.toLowerCase().includes(q) ||
         j.category.toLowerCase().includes(q) ||
         j.roles.toLowerCase().includes(q) ||
+        j.roles_tracked.some((r) => r.title.toLowerCase().includes(q)) ||
         (j.country ?? "").toLowerCase().includes(q) ||
         j.notes.toLowerCase().includes(q)
       );

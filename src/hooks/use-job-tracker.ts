@@ -15,8 +15,19 @@ export type JobState = {
   timeline?: TimelineEvent[];
 };
 
+export type Role = {
+  id: string;
+  title: string;
+  link?: string;
+  location?: string;
+};
+
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
+const ROLES_KEY = "job-tracker-roles-v1";
+
+/** Storage key for a role's own tracking state (reuses the same JobState shape). */
+export const roleKey = (jobId: string, roleId: string) => `${jobId}::${roleId}`;
 
 const defaultState: JobState = {
   status: "not-started",
@@ -26,6 +37,7 @@ const defaultState: JobState = {
 export function useJobTracker() {
   const [map, setMap] = useState<Record<string, JobState>>({});
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
+  const [rolesByJob, setRolesByJob] = useState<Record<string, Role[]>>({});
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -34,6 +46,8 @@ export function useJobTracker() {
       if (raw) setMap(JSON.parse(raw));
       const rawC = localStorage.getItem(CUSTOM_KEY);
       if (rawC) setCustomJobs(JSON.parse(rawC));
+      const rawR = localStorage.getItem(ROLES_KEY);
+      if (rawR) setRolesByJob(JSON.parse(rawR));
     } catch {}
     setHydrated(true);
   }, []);
@@ -45,6 +59,10 @@ export function useJobTracker() {
   useEffect(() => {
     if (hydrated) localStorage.setItem(CUSTOM_KEY, JSON.stringify(customJobs));
   }, [customJobs, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) localStorage.setItem(ROLES_KEY, JSON.stringify(rolesByJob));
+  }, [rolesByJob, hydrated]);
 
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
 
@@ -71,12 +89,56 @@ export function useJobTracker() {
   const removeCustomJob = useCallback((id: string) => {
     setCustomJobs((prev) => prev.filter((j) => j.id !== id));
     setMap((prev) => {
+      const rest: Record<string, JobState> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (k !== id && !k.startsWith(`${id}::`)) rest[k] = v;
+      }
+      return rest;
+    });
+    setRolesByJob((prev) => {
       const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
+  const rolesOf = useCallback((jobId: string): Role[] => rolesByJob[jobId] ?? [], [rolesByJob]);
+
+  const addRole = useCallback((jobId: string, role: Omit<Role, "id">) => {
+    const id = `role-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setRolesByJob((prev) => ({ ...prev, [jobId]: [...(prev[jobId] ?? []), { ...role, id }] }));
+    return id;
+  }, []);
+
+  const updateRole = useCallback((jobId: string, roleId: string, patch: Partial<Omit<Role, "id">>) => {
+    setRolesByJob((prev) => ({
+      ...prev,
+      [jobId]: (prev[jobId] ?? []).map((r) => (r.id === roleId ? { ...r, ...patch } : r)),
+    }));
+  }, []);
+
+  const removeRole = useCallback((jobId: string, roleId: string) => {
+    setRolesByJob((prev) => ({ ...prev, [jobId]: (prev[jobId] ?? []).filter((r) => r.id !== roleId) }));
+    setMap((prev) => {
+      const { [roleKey(jobId, roleId)]: _, ...rest } = prev;
       return rest;
     });
   }, []);
 
   const reset = useCallback(() => setMap({}), []);
 
-  return { get, update, reset, addCustomJob, removeCustomJob, customJobs, map, hydrated };
+  return {
+    get,
+    update,
+    reset,
+    addCustomJob,
+    removeCustomJob,
+    customJobs,
+    rolesByJob,
+    rolesOf,
+    addRole,
+    updateRole,
+    removeRole,
+    map,
+    hydrated,
+  };
 }
