@@ -15,8 +15,19 @@ export type JobState = {
   timeline?: TimelineEvent[];
 };
 
+export type Role = {
+  id: string;
+  title: string;
+  link?: string;
+  location?: string;
+};
+
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
+const ROLES_KEY = "job-tracker-roles-v1";
+
+/** Storage key for a role's own tracking state (reuses the same JobState shape). */
+export const roleKey = (jobId: string, roleId: string) => `${jobId}::${roleId}`;
 
 const defaultState: JobState = {
   status: "not-started",
