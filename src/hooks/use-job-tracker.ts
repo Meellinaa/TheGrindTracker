@@ -37,6 +37,7 @@ const defaultState: JobState = {
 export function useJobTracker() {
   const [map, setMap] = useState<Record<string, JobState>>({});
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
+  const [rolesByJob, setRolesByJob] = useState<Record<string, Role[]>>({});
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export function useJobTracker() {
       if (raw) setMap(JSON.parse(raw));
       const rawC = localStorage.getItem(CUSTOM_KEY);
       if (rawC) setCustomJobs(JSON.parse(rawC));
+      const rawR = localStorage.getItem(ROLES_KEY);
+      if (rawR) setRolesByJob(JSON.parse(rawR));
     } catch {}
     setHydrated(true);
   }, []);
@@ -56,6 +59,10 @@ export function useJobTracker() {
   useEffect(() => {
     if (hydrated) localStorage.setItem(CUSTOM_KEY, JSON.stringify(customJobs));
   }, [customJobs, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) localStorage.setItem(ROLES_KEY, JSON.stringify(rolesByJob));
+  }, [rolesByJob, hydrated]);
 
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
 
