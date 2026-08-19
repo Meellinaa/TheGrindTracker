@@ -123,6 +123,7 @@ function Dashboard() {
         j.company.toLowerCase().includes(q) ||
         j.category.toLowerCase().includes(q) ||
         j.roles.toLowerCase().includes(q) ||
+        j.roles_tracked.some((r) => r.title.toLowerCase().includes(q)) ||
         (j.country ?? "").toLowerCase().includes(q) ||
         j.notes.toLowerCase().includes(q)
       );
