@@ -442,21 +442,51 @@ function StatusPill({ active, onClick, label, color }: { active: boolean; onClic
   );
 }
 
-type EnrichedJob = Job & { group: string; state: JobState };
+function ViewTab({ active, onClick, label, icon }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full border font-semibold transition-all ${
+        active ? "gradient-hero text-primary-foreground border-transparent" : "border-border/60 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+type EnrichedJob = Job & {
+  group: string;
+  state: JobState;
+  roles_tracked: Role[];
+  roleStates: { role: Role; state: JobState }[];
+};
 
 function JobCard({
   job,
   state,
   onChange,
   onDelete,
+  get,
+  update,
+  roles,
+  addRole,
+  removeRole,
 }: {
   job: EnrichedJob;
   state: JobState;
   onChange: (patch: Partial<JobState>) => void;
   onDelete?: () => void;
+  get: (id: string) => JobState;
+  update: (id: string, patch: Partial<JobState>) => void;
+  roles: Role[];
+  addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
+  removeRole: (jobId: string, roleId: string) => void;
 }) {
   const meta = STATUS_META[state.status];
   const initials = job.company.slice(0, 2).toUpperCase();
+  const suggested = job.roles.split(/,|\//).map((s) => s.trim()).filter(Boolean);
 
   return (
     <Dialog>
