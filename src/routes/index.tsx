@@ -265,8 +265,8 @@ function Dashboard() {
 
         {/* Stat Cards */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Applied" value={stats.counts.applied} icon={<Sparkles className="h-5 w-5" />} tint="var(--info)" />
-          <StatCard label="Interviews" value={stats.counts.interview} icon={<Heart className="h-5 w-5" />} tint="var(--lilac)" />
+          <StatCard label="Roles tracked" value={stats.rolesTracked} icon={<Briefcase className="h-5 w-5" />} tint="var(--info)" />
+          <StatCard label="Role apps out" value={stats.rolesApplied} icon={<Sparkles className="h-5 w-5" />} tint="var(--lilac)" />
           <StatCard label="Resumes Ready" value={`${stats.resumeReady}/${stats.total}`} icon={<FileCheck2 className="h-5 w-5" />} tint="var(--success)" />
           <StatCard label="Open Windows" value={stats.openWindow} icon={<CalendarDays className="h-5 w-5" />} tint="var(--pink)" />
         </section>
