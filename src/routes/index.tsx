@@ -554,7 +554,25 @@ function JobCard({
           </Badge>
         </div>
 
-        <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
+        {roles.length > 0 ? (
+          <div className="mt-3 space-y-1">
+            {roles.slice(0, 3).map((r) => {
+              const rs = get(roleKey(job.id, r.id));
+              return (
+                <div key={r.id} className="flex items-center gap-2 text-xs">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: STATUS_META[rs.status].color }} />
+                  <span className="truncate flex-1">{r.title}</span>
+                  <span className="text-muted-foreground shrink-0">{rs.resumeReady ? "📎" : "📝"}</span>
+                </div>
+              );
+            })}
+            {roles.length > 3 && (
+              <p className="text-xs text-muted-foreground">+{roles.length - 3} more roles</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
+        )}
 
         {(state.opensOn || state.closesOn) && (
           <div className="mt-3 text-xs flex items-center gap-2 text-muted-foreground">
