@@ -750,14 +750,6 @@ function AddJobDialog({
   );
 }
 
-function LabeledInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <div>
-      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1" />
-    </div>
-  );
-}
 
 function TimelineDialog({
   open,
