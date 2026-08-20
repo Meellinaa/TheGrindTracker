@@ -586,7 +586,7 @@ function JobCard({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <DialogTrigger asChild>
             <Button size="sm" variant="secondary" className="rounded-lg text-xs">
-              Track & upload
+              <Briefcase className="h-3.5 w-3.5 mr-1" /> Roles {roles.length > 0 ? `(${roles.length})` : ""}
             </Button>
           </DialogTrigger>
           <Button
