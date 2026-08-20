@@ -211,7 +211,7 @@ function Dashboard() {
                 Job Hunt <span className="text-gradient">HQ</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground">
-                {stats.total} targets · {stats.activeApps} in play · {stats.resumeReady} resumes ready
+                {stats.total} companies · {stats.rolesTracked} roles tracked · {stats.rolesApplied} role apps out
               </p>
             </div>
           </div>
