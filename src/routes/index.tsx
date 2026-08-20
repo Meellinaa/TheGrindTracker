@@ -615,27 +615,26 @@ function JobCard({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {STATUSES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => onChange({ status: s })}
-                  className="text-xs px-2 py-2 rounded-lg border font-medium transition-all hover:scale-105"
-                  style={{
-                    background: state.status === s ? STATUS_META[s].color : "transparent",
-                    borderColor: state.status === s ? STATUS_META[s].color : "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  {STATUS_META[s].emoji} {STATUS_META[s].label}
-                </button>
-              ))}
+          <RolesSection
+            jobId={job.id}
+            suggested={suggested}
+            roles={roles}
+            get={get}
+            update={update}
+            addRole={addRole}
+            removeRole={removeRole}
+          />
+
+          <div className="border-t border-border/60 pt-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Company-level status
+            </label>
+            <div className="mt-2">
+              <StatusButtons value={state.status} onChange={(s) => onChange({ status: s })} />
             </div>
           </div>
 
-          <ResumeUploader state={state} onChange={onChange} />
+          <ResumeUploader state={state} onChange={onChange} idSuffix={job.id} />
 
           <div className="grid grid-cols-2 gap-3">
             <DateField label="Opens" value={state.opensOn} onChange={(v) => onChange({ opensOn: v })} />
