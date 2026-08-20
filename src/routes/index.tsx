@@ -137,6 +137,8 @@ function Dashboard() {
     };
     let resumeReady = 0;
     let openWindow = 0;
+    let rolesTracked = 0;
+    let rolesApplied = 0;
     const today = new Date().toISOString().slice(0, 10);
     for (const j of enriched) {
       counts[j.state.status]++;
@@ -144,25 +146,43 @@ function Dashboard() {
       const opens = j.state.opensOn;
       const closes = j.state.closesOn;
       if ((!opens || opens <= today) && (!closes || closes >= today) && (opens || closes)) openWindow++;
+      for (const rs of j.roleStates) {
+        rolesTracked++;
+        if (rs.state.status === "applied" || rs.state.status === "interview" || rs.state.status === "offer")
+          rolesApplied++;
+      }
     }
     const activeApps = counts.applied + counts.interview + counts.offer;
     const progressPct = total ? Math.round(((total - counts["not-started"]) / total) * 100) : 0;
-    return { total, counts, resumeReady, openWindow, activeApps, progressPct };
+    return { total, counts, resumeReady, openWindow, activeApps, progressPct, rolesTracked, rolesApplied };
   }, [enriched]);
 
   const exportCsv = () => {
     const headers = [
-      "Company", "Category", "Country", "Group", "Target Roles", "Link",
+      "Company", "Category", "Country", "Group", "Role", "Link",
       "Status", "Resume Ready", "Resume File", "Opens On", "Closes On", "Applied On", "Notes", "Personal Notes",
     ];
-    const rows = enriched.map((j) => [
-      j.company, j.category, j.country ?? "", j.group, j.roles, j.link,
-      STATUS_META[j.state.status].label,
-      j.state.resumeReady ? "Yes" : "No",
-      j.state.resumeFile?.name ?? "",
-      j.state.opensOn ?? "", j.state.closesOn ?? "", j.state.appliedOn ?? "",
-      j.notes, j.state.notes ?? "",
-    ]);
+    const rows: string[][] = [];
+    for (const j of enriched) {
+      rows.push([
+        j.company, j.category, j.country ?? "", j.group, `Company target: ${j.roles}`, j.link,
+        STATUS_META[j.state.status].label,
+        j.state.resumeReady ? "Yes" : "No",
+        j.state.resumeFile?.name ?? "",
+        j.state.opensOn ?? "", j.state.closesOn ?? "", j.state.appliedOn ?? "",
+        j.notes, j.state.notes ?? "",
+      ]);
+      for (const { role, state } of j.roleStates) {
+        rows.push([
+          j.company, j.category, j.country ?? "", j.group, role.title, role.link ?? j.link,
+          STATUS_META[state.status].label,
+          state.resumeReady ? "Yes" : "No",
+          state.resumeFile?.name ?? "",
+          state.opensOn ?? "", state.closesOn ?? "", state.appliedOn ?? "",
+          "", state.notes ?? "",
+        ]);
+      }
+    }
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
