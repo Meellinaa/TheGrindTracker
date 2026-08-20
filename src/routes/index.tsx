@@ -331,33 +331,66 @@ function Dashboard() {
           </Select>
         </section>
 
+        {/* View toggle */}
+        <section className="flex items-center gap-2">
+          <ViewTab active={view === "category"} onClick={() => setView("category")} icon={<LayoutGrid className="h-4 w-4" />} label="By category" />
+          <ViewTab active={view === "company"} onClick={() => setView("company")} icon={<Building2 className="h-4 w-4" />} label="Companies A–Z" />
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} companies shown</span>
+        </section>
+
         {/* Groups */}
         <section className="space-y-8">
-          {groups
-            .filter((g) => groupFilter === "all" || g === groupFilter)
-            .map((g) => {
-              const items = filtered.filter((j) => j.group === g);
-              if (items.length === 0) return null;
-              return (
-                <div key={g}>
-                  <div className="flex items-baseline justify-between mb-3">
-                    <h3 className="text-lg sm:text-xl font-bold">{g}</h3>
-                    <span className="text-xs text-muted-foreground">{items.length} companies</span>
+          {view === "company" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {[...filtered]
+                .sort((a, b) => a.company.localeCompare(b.company))
+                .map((j) => (
+                  <JobCard
+                    key={j.id}
+                    job={j}
+                    state={j.state}
+                    onChange={(patch) => update(j.id, patch)}
+                    onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
+                    get={get}
+                    update={update}
+                    roles={rolesOf(j.id)}
+                    addRole={addRole}
+                    removeRole={removeRole}
+                  />
+                ))}
+            </div>
+          ) : (
+            groups
+              .filter((g) => groupFilter === "all" || g === groupFilter)
+              .map((g) => {
+                const items = filtered.filter((j) => j.group === g);
+                if (items.length === 0) return null;
+                return (
+                  <div key={g}>
+                    <div className="flex items-baseline justify-between mb-3">
+                      <h3 className="text-lg sm:text-xl font-bold">{g}</h3>
+                      <span className="text-xs text-muted-foreground">{items.length} companies</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      {items.map((j) => (
+                        <JobCard
+                          key={j.id}
+                          job={j}
+                          state={j.state}
+                          onChange={(patch) => update(j.id, patch)}
+                          onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
+                          get={get}
+                          update={update}
+                          roles={rolesOf(j.id)}
+                          addRole={addRole}
+                          removeRole={removeRole}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {items.map((j) => (
-                      <JobCard
-                        key={j.id}
-                        job={j}
-                        state={j.state}
-                        onChange={(patch) => update(j.id, patch)}
-                        onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+          )}
           {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
