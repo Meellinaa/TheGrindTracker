@@ -761,10 +761,15 @@ function TimelineDialog({
   jobs: EnrichedJob[];
 }) {
   const events = useMemo(() => {
-    const list: { date: string; company: string; status: AppStatus }[] = [];
+    const list: { date: string; company: string; role?: string; status: AppStatus }[] = [];
     for (const j of jobs) {
       for (const t of j.state.timeline ?? []) {
         list.push({ date: t.date, company: j.company, status: t.status });
+      }
+      for (const rs of j.roleStates) {
+        for (const t of rs.state.timeline ?? []) {
+          list.push({ date: t.date, company: j.company, role: rs.role.title, status: t.status });
+        }
       }
     }
     return list.sort((a, b) => b.date.localeCompare(a.date));
