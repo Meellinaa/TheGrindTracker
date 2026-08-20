@@ -800,7 +800,9 @@ function TimelineDialog({
                   </span>
                   <span className="text-xs text-muted-foreground">{e.date}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{STATUS_META[e.status].label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {e.role ? `${e.role} · ` : ""}{STATUS_META[e.status].label}
+                </p>
               </li>
             ))}
           </ol>
