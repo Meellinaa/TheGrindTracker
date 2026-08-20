@@ -137,6 +137,8 @@ function Dashboard() {
     };
     let resumeReady = 0;
     let openWindow = 0;
+    let rolesTracked = 0;
+    let rolesApplied = 0;
     const today = new Date().toISOString().slice(0, 10);
     for (const j of enriched) {
       counts[j.state.status]++;
@@ -144,25 +146,43 @@ function Dashboard() {
       const opens = j.state.opensOn;
       const closes = j.state.closesOn;
       if ((!opens || opens <= today) && (!closes || closes >= today) && (opens || closes)) openWindow++;
+      for (const rs of j.roleStates) {
+        rolesTracked++;
+        if (rs.state.status === "applied" || rs.state.status === "interview" || rs.state.status === "offer")
+          rolesApplied++;
+      }
     }
     const activeApps = counts.applied + counts.interview + counts.offer;
     const progressPct = total ? Math.round(((total - counts["not-started"]) / total) * 100) : 0;
-    return { total, counts, resumeReady, openWindow, activeApps, progressPct };
+    return { total, counts, resumeReady, openWindow, activeApps, progressPct, rolesTracked, rolesApplied };
   }, [enriched]);
 
   const exportCsv = () => {
     const headers = [
-      "Company", "Category", "Country", "Group", "Target Roles", "Link",
+      "Company", "Category", "Country", "Group", "Role", "Link",
       "Status", "Resume Ready", "Resume File", "Opens On", "Closes On", "Applied On", "Notes", "Personal Notes",
     ];
-    const rows = enriched.map((j) => [
-      j.company, j.category, j.country ?? "", j.group, j.roles, j.link,
-      STATUS_META[j.state.status].label,
-      j.state.resumeReady ? "Yes" : "No",
-      j.state.resumeFile?.name ?? "",
-      j.state.opensOn ?? "", j.state.closesOn ?? "", j.state.appliedOn ?? "",
-      j.notes, j.state.notes ?? "",
-    ]);
+    const rows: string[][] = [];
+    for (const j of enriched) {
+      rows.push([
+        j.company, j.category, j.country ?? "", j.group, `Company target: ${j.roles}`, j.link,
+        STATUS_META[j.state.status].label,
+        j.state.resumeReady ? "Yes" : "No",
+        j.state.resumeFile?.name ?? "",
+        j.state.opensOn ?? "", j.state.closesOn ?? "", j.state.appliedOn ?? "",
+        j.notes, j.state.notes ?? "",
+      ]);
+      for (const { role, state } of j.roleStates) {
+        rows.push([
+          j.company, j.category, j.country ?? "", j.group, role.title, role.link ?? j.link,
+          STATUS_META[state.status].label,
+          state.resumeReady ? "Yes" : "No",
+          state.resumeFile?.name ?? "",
+          state.opensOn ?? "", state.closesOn ?? "", state.appliedOn ?? "",
+          "", state.notes ?? "",
+        ]);
+      }
+    }
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
@@ -191,7 +211,7 @@ function Dashboard() {
                 Job Hunt <span className="text-gradient">HQ</span> ✨
               </h1>
               <p className="text-xs text-muted-foreground">
-                {stats.total} targets · {stats.activeApps} in play · {stats.resumeReady} resumes ready
+                {stats.total} companies · {stats.rolesTracked} roles tracked · {stats.rolesApplied} role apps out
               </p>
             </div>
           </div>
@@ -245,8 +265,8 @@ function Dashboard() {
 
         {/* Stat Cards */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Applied" value={stats.counts.applied} icon={<Sparkles className="h-5 w-5" />} tint="var(--info)" />
-          <StatCard label="Interviews" value={stats.counts.interview} icon={<Heart className="h-5 w-5" />} tint="var(--lilac)" />
+          <StatCard label="Roles tracked" value={stats.rolesTracked} icon={<Briefcase className="h-5 w-5" />} tint="var(--info)" />
+          <StatCard label="Role apps out" value={stats.rolesApplied} icon={<Sparkles className="h-5 w-5" />} tint="var(--lilac)" />
           <StatCard label="Resumes Ready" value={`${stats.resumeReady}/${stats.total}`} icon={<FileCheck2 className="h-5 w-5" />} tint="var(--success)" />
           <StatCard label="Open Windows" value={stats.openWindow} icon={<CalendarDays className="h-5 w-5" />} tint="var(--pink)" />
         </section>
@@ -311,33 +331,66 @@ function Dashboard() {
           </Select>
         </section>
 
+        {/* View toggle */}
+        <section className="flex items-center gap-2">
+          <ViewTab active={view === "category"} onClick={() => setView("category")} icon={<LayoutGrid className="h-4 w-4" />} label="By category" />
+          <ViewTab active={view === "company"} onClick={() => setView("company")} icon={<Building2 className="h-4 w-4" />} label="Companies A–Z" />
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} companies shown</span>
+        </section>
+
         {/* Groups */}
         <section className="space-y-8">
-          {groups
-            .filter((g) => groupFilter === "all" || g === groupFilter)
-            .map((g) => {
-              const items = filtered.filter((j) => j.group === g);
-              if (items.length === 0) return null;
-              return (
-                <div key={g}>
-                  <div className="flex items-baseline justify-between mb-3">
-                    <h3 className="text-lg sm:text-xl font-bold">{g}</h3>
-                    <span className="text-xs text-muted-foreground">{items.length} companies</span>
+          {view === "company" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {[...filtered]
+                .sort((a, b) => a.company.localeCompare(b.company))
+                .map((j) => (
+                  <JobCard
+                    key={j.id}
+                    job={j}
+                    state={j.state}
+                    onChange={(patch) => update(j.id, patch)}
+                    onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
+                    get={get}
+                    update={update}
+                    roles={rolesOf(j.id)}
+                    addRole={addRole}
+                    removeRole={removeRole}
+                  />
+                ))}
+            </div>
+          ) : (
+            groups
+              .filter((g) => groupFilter === "all" || g === groupFilter)
+              .map((g) => {
+                const items = filtered.filter((j) => j.group === g);
+                if (items.length === 0) return null;
+                return (
+                  <div key={g}>
+                    <div className="flex items-baseline justify-between mb-3">
+                      <h3 className="text-lg sm:text-xl font-bold">{g}</h3>
+                      <span className="text-xs text-muted-foreground">{items.length} companies</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      {items.map((j) => (
+                        <JobCard
+                          key={j.id}
+                          job={j}
+                          state={j.state}
+                          onChange={(patch) => update(j.id, patch)}
+                          onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
+                          get={get}
+                          update={update}
+                          roles={rolesOf(j.id)}
+                          addRole={addRole}
+                          removeRole={removeRole}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {items.map((j) => (
-                      <JobCard
-                        key={j.id}
-                        job={j}
-                        state={j.state}
-                        onChange={(patch) => update(j.id, patch)}
-                        onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+          )}
           {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
@@ -389,21 +442,51 @@ function StatusPill({ active, onClick, label, color }: { active: boolean; onClic
   );
 }
 
-type EnrichedJob = Job & { group: string; state: JobState };
+function ViewTab({ active, onClick, label, icon }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full border font-semibold transition-all ${
+        active ? "gradient-hero text-primary-foreground border-transparent" : "border-border/60 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+type EnrichedJob = Job & {
+  group: string;
+  state: JobState;
+  roles_tracked: Role[];
+  roleStates: { role: Role; state: JobState }[];
+};
 
 function JobCard({
   job,
   state,
   onChange,
   onDelete,
+  get,
+  update,
+  roles,
+  addRole,
+  removeRole,
 }: {
   job: EnrichedJob;
   state: JobState;
   onChange: (patch: Partial<JobState>) => void;
   onDelete?: () => void;
+  get: (id: string) => JobState;
+  update: (id: string, patch: Partial<JobState>) => void;
+  roles: Role[];
+  addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
+  removeRole: (jobId: string, roleId: string) => void;
 }) {
   const meta = STATUS_META[state.status];
   const initials = job.company.slice(0, 2).toUpperCase();
+  const suggested = job.roles.split(/,|\//).map((s) => s.trim()).filter(Boolean);
 
   return (
     <Dialog>
@@ -471,7 +554,25 @@ function JobCard({
           </Badge>
         </div>
 
-        <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
+        {roles.length > 0 ? (
+          <div className="mt-3 space-y-1">
+            {roles.slice(0, 3).map((r) => {
+              const rs = get(roleKey(job.id, r.id));
+              return (
+                <div key={r.id} className="flex items-center gap-2 text-xs">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: STATUS_META[rs.status].color }} />
+                  <span className="truncate flex-1">{r.title}</span>
+                  <span className="text-muted-foreground shrink-0">{rs.resumeReady ? "📎" : "📝"}</span>
+                </div>
+              );
+            })}
+            {roles.length > 3 && (
+              <p className="text-xs text-muted-foreground">+{roles.length - 3} more roles</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
+        )}
 
         {(state.opensOn || state.closesOn) && (
           <div className="mt-3 text-xs flex items-center gap-2 text-muted-foreground">
@@ -485,7 +586,7 @@ function JobCard({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <DialogTrigger asChild>
             <Button size="sm" variant="secondary" className="rounded-lg text-xs">
-              Track & upload
+              <Briefcase className="h-3.5 w-3.5 mr-1" /> Roles {roles.length > 0 ? `(${roles.length})` : ""}
             </Button>
           </DialogTrigger>
           <Button
@@ -514,27 +615,26 @@ function JobCard({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {STATUSES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => onChange({ status: s })}
-                  className="text-xs px-2 py-2 rounded-lg border font-medium transition-all hover:scale-105"
-                  style={{
-                    background: state.status === s ? STATUS_META[s].color : "transparent",
-                    borderColor: state.status === s ? STATUS_META[s].color : "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  {STATUS_META[s].emoji} {STATUS_META[s].label}
-                </button>
-              ))}
+          <RolesSection
+            jobId={job.id}
+            suggested={suggested}
+            roles={roles}
+            get={get}
+            update={update}
+            addRole={addRole}
+            removeRole={removeRole}
+          />
+
+          <div className="border-t border-border/60 pt-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Company-level status
+            </label>
+            <div className="mt-2">
+              <StatusButtons value={state.status} onChange={(s) => onChange({ status: s })} />
             </div>
           </div>
 
-          <ResumeUploader state={state} onChange={onChange} />
+          <ResumeUploader state={state} onChange={onChange} idSuffix={job.id} />
 
           <div className="grid grid-cols-2 gap-3">
             <DateField label="Opens" value={state.opensOn} onChange={(v) => onChange({ opensOn: v })} />
@@ -586,86 +686,6 @@ function JobCard({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ResumeUploader({ state, onChange }: { state: JobState; onChange: (patch: Partial<JobState>) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Please pick a file under 5MB 💗");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const rf: ResumeFile = { name: file.name, dataUrl, size: file.size };
-      onChange({ resumeFile: rf, resumeReady: true });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div className="rounded-xl border border-border/60 p-3 bg-muted/40">
-      <div className="flex items-center gap-2 mb-2">
-        <Checkbox
-          id="resume-ready"
-          checked={state.resumeReady}
-          onCheckedChange={(v) => onChange({ resumeReady: !!v })}
-        />
-        <label htmlFor="resume-ready" className="text-sm font-medium cursor-pointer">
-          Resume tailored & ready 💕
-        </label>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.doc,.docx"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
-        }}
-      />
-
-      {state.resumeFile ? (
-        <div className="flex items-center gap-2 text-xs">
-          <a
-            href={state.resumeFile.dataUrl}
-            download={state.resumeFile.name}
-            className="flex-1 truncate font-semibold text-primary hover:underline"
-          >
-            📎 {state.resumeFile.name}
-          </a>
-          <Button size="sm" variant="ghost" onClick={() => inputRef.current?.click()}>
-            Replace
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => onChange({ resumeFile: undefined })}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full rounded-lg"
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="h-3.5 w-3.5 mr-2" /> Upload resume (PDF/DOC)
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function DateField({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</label>
-      <Input type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="mt-1" />
-    </div>
   );
 }
 
@@ -730,14 +750,6 @@ function AddJobDialog({
   );
 }
 
-function LabeledInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <div>
-      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1" />
-    </div>
-  );
-}
 
 function TimelineDialog({
   open,
@@ -749,10 +761,15 @@ function TimelineDialog({
   jobs: EnrichedJob[];
 }) {
   const events = useMemo(() => {
-    const list: { date: string; company: string; status: AppStatus }[] = [];
+    const list: { date: string; company: string; role?: string; status: AppStatus }[] = [];
     for (const j of jobs) {
       for (const t of j.state.timeline ?? []) {
         list.push({ date: t.date, company: j.company, status: t.status });
+      }
+      for (const rs of j.roleStates) {
+        for (const t of rs.state.timeline ?? []) {
+          list.push({ date: t.date, company: j.company, role: rs.role.title, status: t.status });
+        }
       }
     }
     return list.sort((a, b) => b.date.localeCompare(a.date));
@@ -783,7 +800,9 @@ function TimelineDialog({
                   </span>
                   <span className="text-xs text-muted-foreground">{e.date}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{STATUS_META[e.status].label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {e.role ? `${e.role} · ` : ""}{STATUS_META[e.status].label}
+                </p>
               </li>
             ))}
           </ol>
