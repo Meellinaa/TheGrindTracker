@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import type { AppStatus, Job } from "@/data/jobs";
+import { saveResumeData, loadResumeData, deleteResumeData } from "@/lib/resume-store";
+
+/** Strip big base64 payloads before writing to localStorage (files live in IndexedDB). */
+const stripForStorage = (s: JobState): JobState =>
+  s.resumeFile ? { ...s, resumeFile: { ...s.resumeFile, dataUrl: "" } } : s;
 
 export type ResumeFile = { name: string; dataUrl: string; size: number };
 export type TimelineEvent = { date: string; status: AppStatus; note?: string };
