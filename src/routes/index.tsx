@@ -333,8 +333,8 @@ function Dashboard() {
 
         {/* View toggle */}
         <section className="flex items-center gap-2">
-          <ViewTab active={view === "category"} onClick={() => setView("category")} icon={<LayoutGrid className="h-4 w-4" />} label="By category" />
           <ViewTab active={view === "company"} onClick={() => setView("company")} icon={<Building2 className="h-4 w-4" />} label="Companies A–Z" />
+          <ViewTab active={view === "category"} onClick={() => setView("category")} icon={<LayoutGrid className="h-4 w-4" />} label="By category" />
           <span className="text-xs text-muted-foreground ml-auto">{filtered.length} companies shown</span>
         </section>
 
