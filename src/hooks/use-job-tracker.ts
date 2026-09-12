@@ -163,6 +163,7 @@ export function useJobTracker() {
 
   const removeRole = useCallback((jobId: string, roleId: string) => {
     setRolesByJob((prev) => ({ ...prev, [jobId]: (prev[jobId] ?? []).filter((r) => r.id !== roleId) }));
+    deleteResumeData(roleKey(jobId, roleId)).catch(() => {});
     setMap((prev) => {
       const { [roleKey(jobId, roleId)]: _, ...rest } = prev;
       return rest;

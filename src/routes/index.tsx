@@ -81,7 +81,7 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [view, setView] = useState<"category" | "company">("category");
+  const [view, setView] = useState<"category" | "company">("company");
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
