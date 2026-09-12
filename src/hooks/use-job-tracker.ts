@@ -48,7 +48,26 @@ export function useJobTracker() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setMap(JSON.parse(raw));
+      if (raw) {
+        const stored: Record<string, JobState> = JSON.parse(raw);
+        setMap(stored);
+        // Re-attach resume payloads from IndexedDB; migrate any still inline.
+        for (const [id, st] of Object.entries(stored)) {
+          if (!st.resumeFile) continue;
+          if (st.resumeFile.dataUrl) {
+            saveResumeData(id, st.resumeFile.dataUrl).catch(() => {});
+          } else {
+            loadResumeData(id)
+              .then((dataUrl) => {
+                if (!dataUrl) return;
+                setMap((prev) =>
+                  prev[id]?.resumeFile ? { ...prev, [id]: { ...prev[id], resumeFile: { ...prev[id].resumeFile!, dataUrl } } } : prev,
+                );
+              })
+              .catch(() => {});
+          }
+        }
+      }
       const rawC = localStorage.getItem(CUSTOM_KEY);
       if (rawC) setCustomJobs(JSON.parse(rawC));
       const rawR = localStorage.getItem(ROLES_KEY);
@@ -57,16 +76,31 @@ export function useJobTracker() {
     setHydrated(true);
   }, []);
 
+  const persist = (key: string, value: unknown) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      alert("Your browser storage is full — try deleting an old resume file. 💗");
+    }
+  };
+
   useEffect(() => {
-    if (hydrated) localStorage.setItem(KEY, JSON.stringify(map));
+    if (hydrated) {
+      const stripped: Record<string, JobState> = {};
+      for (const [k, v] of Object.entries(map)) stripped[k] = stripForStorage(v);
+      persist(KEY, stripped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, hydrated]);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(CUSTOM_KEY, JSON.stringify(customJobs));
+    if (hydrated) persist(CUSTOM_KEY, customJobs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customJobs, hydrated]);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(ROLES_KEY, JSON.stringify(rolesByJob));
+    if (hydrated) persist(ROLES_KEY, rolesByJob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesByJob, hydrated]);
 
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
