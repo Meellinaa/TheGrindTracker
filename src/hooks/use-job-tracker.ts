@@ -106,6 +106,10 @@ export function useJobTracker() {
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
 
   const update = useCallback((id: string, patch: Partial<JobState>) => {
+    if ("resumeFile" in patch) {
+      if (patch.resumeFile?.dataUrl) saveResumeData(id, patch.resumeFile.dataUrl).catch(() => {});
+      if (!patch.resumeFile) deleteResumeData(id).catch(() => {});
+    }
     setMap((prev) => {
       const current = prev[id] ?? defaultState;
       const next: JobState = { ...current, ...patch };
