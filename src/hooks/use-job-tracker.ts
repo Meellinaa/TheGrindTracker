@@ -131,10 +131,12 @@ export function useJobTracker() {
 
   const removeCustomJob = useCallback((id: string) => {
     setCustomJobs((prev) => prev.filter((j) => j.id !== id));
+    deleteResumeData(id).catch(() => {});
     setMap((prev) => {
       const rest: Record<string, JobState> = {};
       for (const [k, v] of Object.entries(prev)) {
         if (k !== id && !k.startsWith(`${id}::`)) rest[k] = v;
+        else if (k.startsWith(`${id}::`)) deleteResumeData(k).catch(() => {});
       }
       return rest;
     });
