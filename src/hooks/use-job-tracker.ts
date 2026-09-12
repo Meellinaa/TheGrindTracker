@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import type { AppStatus, Job } from "@/data/jobs";
+import { saveResumeData, loadResumeData, deleteResumeData } from "@/lib/resume-store";
+
+/** Strip big base64 payloads before writing to localStorage (files live in IndexedDB). */
+const stripForStorage = (s: JobState): JobState =>
+  s.resumeFile ? { ...s, resumeFile: { ...s.resumeFile, dataUrl: "" } } : s;
 
 export type ResumeFile = { name: string; dataUrl: string; size: number };
 export type TimelineEvent = { date: string; status: AppStatus; note?: string };
@@ -43,7 +48,26 @@ export function useJobTracker() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setMap(JSON.parse(raw));
+      if (raw) {
+        const stored: Record<string, JobState> = JSON.parse(raw);
+        setMap(stored);
+        // Re-attach resume payloads from IndexedDB; migrate any still inline.
+        for (const [id, st] of Object.entries(stored)) {
+          if (!st.resumeFile) continue;
+          if (st.resumeFile.dataUrl) {
+            saveResumeData(id, st.resumeFile.dataUrl).catch(() => {});
+          } else {
+            loadResumeData(id)
+              .then((dataUrl) => {
+                if (!dataUrl) return;
+                setMap((prev) =>
+                  prev[id]?.resumeFile ? { ...prev, [id]: { ...prev[id], resumeFile: { ...prev[id].resumeFile!, dataUrl } } } : prev,
+                );
+              })
+              .catch(() => {});
+          }
+        }
+      }
       const rawC = localStorage.getItem(CUSTOM_KEY);
       if (rawC) setCustomJobs(JSON.parse(rawC));
       const rawR = localStorage.getItem(ROLES_KEY);
@@ -52,21 +76,40 @@ export function useJobTracker() {
     setHydrated(true);
   }, []);
 
+  const persist = (key: string, value: unknown) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      alert("Your browser storage is full — try deleting an old resume file. 💗");
+    }
+  };
+
   useEffect(() => {
-    if (hydrated) localStorage.setItem(KEY, JSON.stringify(map));
+    if (hydrated) {
+      const stripped: Record<string, JobState> = {};
+      for (const [k, v] of Object.entries(map)) stripped[k] = stripForStorage(v);
+      persist(KEY, stripped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, hydrated]);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(CUSTOM_KEY, JSON.stringify(customJobs));
+    if (hydrated) persist(CUSTOM_KEY, customJobs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customJobs, hydrated]);
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem(ROLES_KEY, JSON.stringify(rolesByJob));
+    if (hydrated) persist(ROLES_KEY, rolesByJob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesByJob, hydrated]);
 
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
 
   const update = useCallback((id: string, patch: Partial<JobState>) => {
+    if ("resumeFile" in patch) {
+      if (patch.resumeFile?.dataUrl) saveResumeData(id, patch.resumeFile.dataUrl).catch(() => {});
+      if (!patch.resumeFile) deleteResumeData(id).catch(() => {});
+    }
     setMap((prev) => {
       const current = prev[id] ?? defaultState;
       const next: JobState = { ...current, ...patch };
@@ -88,10 +131,12 @@ export function useJobTracker() {
 
   const removeCustomJob = useCallback((id: string) => {
     setCustomJobs((prev) => prev.filter((j) => j.id !== id));
+    deleteResumeData(id).catch(() => {});
     setMap((prev) => {
       const rest: Record<string, JobState> = {};
       for (const [k, v] of Object.entries(prev)) {
         if (k !== id && !k.startsWith(`${id}::`)) rest[k] = v;
+        else if (k.startsWith(`${id}::`)) deleteResumeData(k).catch(() => {});
       }
       return rest;
     });
@@ -118,6 +163,7 @@ export function useJobTracker() {
 
   const removeRole = useCallback((jobId: string, roleId: string) => {
     setRolesByJob((prev) => ({ ...prev, [jobId]: (prev[jobId] ?? []).filter((r) => r.id !== roleId) }));
+    deleteResumeData(roleKey(jobId, roleId)).catch(() => {});
     setMap((prev) => {
       const { [roleKey(jobId, roleId)]: _, ...rest } = prev;
       return rest;
