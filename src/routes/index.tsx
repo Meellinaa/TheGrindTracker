@@ -1,654 +1,296 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
+import { JOBS, STATUS_META, type AppStatus, type Job } from "@/data/jobs";
 import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { DateField, LabeledInput, ResumeUploader, StatusButtons, STATUSES } from "@/components/track-fields";
+import { DateField, LabeledInput, ResumeUploader, StatusButtons } from "@/components/track-fields";
 import { RolesSection } from "@/components/roles-section";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  ExternalLink,
-  Search,
-  Download,
-  FileCheck2,
-  FileX2,
-  Heart,
-  CalendarDays,
-  Plus,
-  Trash2,
-  Globe,
-  Clock,
-  Building2,
-  Briefcase,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Building2, CalendarDays, Download, ExternalLink, FileText, Plus, Search, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
   head: () => ({
     meta: [
       { title: "Job Hunt HQ | Application Tracker" },
-      {
-        name: "description",
-        content:
-          "Track companies, roles, application dates, notes, and tailored resumes in one organized workspace.",
-      },
-       { property: "og:title", content: "Job Hunt HQ | Application Tracker" },
-      { property: "og:description", content: "Track applications, upload resumes, and log a timeline across your target companies." },
-       { property: "og:type", content: "website" },
-       { name: "twitter:card", content: "summary" },
+      { name: "description", content: "Track companies, roles, deadlines, notes, and tailored resumes in one organized workspace." },
+      { property: "og:title", content: "Job Hunt HQ | Application Tracker" },
+      { property: "og:description", content: "A practical workspace for job applications, roles, resumes, and deadlines." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
 
-function Dashboard() {
-  const {
-    get,
-    update,
-    addCustomJob,
-    removeCustomJob,
-    customJobs,
-    rolesOf,
-    rolesByJob,
-    addRole,
-    removeRole,
-    hydrated,
-  } = useJobTracker();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [groupFilter, setGroupFilter] = useState<string>("all");
-  const [countryFilter, setCountryFilter] = useState<string>("all");
-  const [resumeFilter, setResumeFilter] = useState<string>("all");
-  const [addOpen, setAddOpen] = useState(false);
-  const [timelineOpen, setTimelineOpen] = useState(false);
-
-  const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
-
-  const enriched = useMemo(
-    () =>
-      allJobs.map((j) => {
-        const roles = rolesByJob[j.id] ?? [];
-        return {
-          ...j,
-          group: j.id.startsWith("custom-") ? "💖 My Custom Adds" : groupOf(j.category),
-          state: get(j.id),
-          roles_tracked: roles,
-          roleStates: roles.map((r) => ({ role: r, state: get(roleKey(j.id, r.id)) })),
-        };
-      }),
-    [allJobs, get, rolesByJob],
-  );
-
-  const groups = useMemo(() => {
-    const s = new Set(enriched.map((j) => j.group));
-    return Array.from(s).sort();
-  }, [enriched]);
-
-  const countries = useMemo(() => {
-    const s = new Set(enriched.map((j) => j.country ?? "Canada"));
-    return Array.from(s).sort();
-  }, [enriched]);
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    return enriched.filter((j) => {
-      if (statusFilter !== "all" && j.state.status !== statusFilter) return false;
-      if (groupFilter !== "all" && j.group !== groupFilter) return false;
-      if (countryFilter !== "all" && (j.country ?? "Canada") !== countryFilter) return false;
-      if (resumeFilter === "ready" && !j.state.resumeReady) return false;
-      if (resumeFilter === "missing" && j.state.resumeReady) return false;
-      if (!q) return true;
-      return (
-        j.company.toLowerCase().includes(q) ||
-        j.category.toLowerCase().includes(q) ||
-        j.roles.toLowerCase().includes(q) ||
-        j.roles_tracked.some((r) => r.title.toLowerCase().includes(q)) ||
-        (j.country ?? "").toLowerCase().includes(q) ||
-        j.notes.toLowerCase().includes(q)
-      );
-    });
-  }, [enriched, query, statusFilter, groupFilter, countryFilter, resumeFilter]);
-
-  const stats = useMemo(() => {
-    const counts: Record<AppStatus, number> = {
-      "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
-    };
-    for (const j of enriched) {
-      counts[j.state.status]++;
-    }
-    return { total: enriched.length, counts };
-  }, [enriched]);
-
-  const exportCsv = () => {
-    const headers = [
-      "Company", "Role", "Country", "Category", "Status", "Applied Date",
-      "Opening Date", "Closing Date", "Resume Ready", "Resume File", "Job Link", "Notes",
-    ];
-    const rows: string[][] = [];
-    for (const j of enriched) {
-      const exportRoles = j.roleStates.length > 0
-        ? j.roleStates
-        : [{ role: { id: j.id, title: j.roles, link: j.link }, state: j.state }];
-      for (const { role, state } of exportRoles) {
-        rows.push([
-          j.company, role.title, j.country ?? "", j.category, STATUS_META[state.status].label,
-          state.appliedOn ?? "", state.opensOn ?? "", state.closesOn ?? "",
-          state.resumeReady ? "Yes" : "No", state.resumeFile?.name ?? "",
-          role.link ?? j.link, state.notes ?? j.notes,
-        ]);
-      }
-    }
-    const csv = [headers, ...rows]
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `job-applications-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (!hydrated) return null;
-
-  return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-border/40 backdrop-blur-xl sticky top-0 z-40 bg-background/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-2xl gradient-hero glow flex items-center justify-center animate-float">
-              <Heart className="h-5 w-5 text-primary-foreground" fill="currentColor" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-                Job Hunt <span className="text-gradient">HQ</span> ✨
-              </h1>
-               <p className="text-xs text-muted-foreground">Companies, roles, dates, notes, and resumes</p>
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-             <Button onClick={() => setTimelineOpen(true)} variant="secondary">
-              <Clock className="h-4 w-4 mr-2" /> Timeline
-            </Button>
-             <Button onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Add job
-            </Button>
-             <Button onClick={exportCsv} variant="secondary">
-              <Download className="h-4 w-4 mr-2" />
-               Export spreadsheet
-            </Button>
-          </div>
-        </div>
-      </header>
-
-       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-
-        {/* Filters */}
-        <section className="flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search company, role, country, notes…"
-              className="pl-9 h-11 rounded-xl bg-card/60 border-border/60"
-            />
-          </div>
-           <Select value={statusFilter} onValueChange={setStatusFilter}>
-             <SelectTrigger className="h-11 bg-card/60 border-border/60 w-[180px]">
-               <SelectValue placeholder="Status" />
-             </SelectTrigger>
-             <SelectContent>
-               <SelectItem value="all">All statuses ({stats.total})</SelectItem>
-               {STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_META[s].label} ({stats.counts[s]})</SelectItem>)}
-             </SelectContent>
-           </Select>
-          <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[170px]">
-              <Globe className="h-4 w-4 mr-1 opacity-60" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">🌍 All countries</SelectItem>
-              {countries.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={groupFilter} onValueChange={setGroupFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[200px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {groups.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={resumeFilter} onValueChange={setResumeFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any resume</SelectItem>
-              <SelectItem value="ready">✅ Resume ready</SelectItem>
-              <SelectItem value="missing">📝 Needs resume</SelectItem>
-            </SelectContent>
-          </Select>
-        </section>
-
-         <section>
-           <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Companies A to Z</h2>
-             <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
-           </div>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {[...filtered]
-                .sort((a, b) => a.company.localeCompare(b.company))
-                .map((j) => (
-                  <JobCard
-                    key={j.id}
-                    job={j}
-                    state={j.state}
-                    onChange={(patch) => update(j.id, patch)}
-                    onDelete={j.id.startsWith("custom-") ? () => removeCustomJob(j.id) : undefined}
-                    get={get}
-                    update={update}
-                    roles={rolesOf(j.id)}
-                    addRole={addRole}
-                    removeRole={removeRole}
-                  />
-                ))}
-           </div>
-          {filtered.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              No matches. Adjust your filters or add a new job. 💌
-            </div>
-          )}
-        </section>
-
-        <footer className="text-center text-xs text-muted-foreground pt-8 pb-4">
-           Your information stays in this browser. Export a spreadsheet backup anytime.
-        </footer>
-      </main>
-
-      <AddJobDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCustomJob} />
-      <TimelineDialog open={timelineOpen} onOpenChange={setTimelineOpen} jobs={enriched} />
-    </div>
-  );
-}
-
 type EnrichedJob = Job & {
-  group: string;
   state: JobState;
   roles_tracked: Role[];
   roleStates: { role: Role; state: JobState }[];
 };
 
-function JobCard({
-  job,
-  state,
-  onChange,
-  onDelete,
-  get,
-  update,
-  roles,
-  addRole,
-  removeRole,
-}: {
-  job: EnrichedJob;
-  state: JobState;
-  onChange: (patch: Partial<JobState>) => void;
-  onDelete?: () => void;
-  get: (id: string) => JobState;
-  update: (id: string, patch: Partial<JobState>) => void;
-  roles: Role[];
-  addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
-  removeRole: (jobId: string, roleId: string) => void;
-}) {
-  const meta = STATUS_META[state.status];
-  const initials = job.company.slice(0, 2).toUpperCase();
-  const suggested = job.roles.split(/,|\//).map((s) => s.trim()).filter(Boolean);
+type WorkspaceView = "companies" | "dates";
+
+function Dashboard() {
+  const tracker = useJobTracker();
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<WorkspaceView>("companies");
+  const [addOpen, setAddOpen] = useState(false);
+
+  const enriched = useMemo<EnrichedJob[]>(() => [...tracker.customJobs, ...JOBS].map((job) => {
+    const roles = tracker.rolesByJob[job.id] ?? [];
+    return {
+      ...job,
+      state: tracker.get(job.id),
+      roles_tracked: roles,
+      roleStates: roles.map((role) => ({ role, state: tracker.get(roleKey(job.id, role.id)) })),
+    };
+  }), [tracker.customJobs, tracker.rolesByJob, tracker.get]);
+
+  const filtered = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return enriched.filter((job) => {
+      const roleMatch = job.roleStates.some(({ role, state }) =>
+        role.title.toLowerCase().includes(text) && (statusFilter === "all" || state.status === statusFilter));
+      const companyStatusMatch = statusFilter === "all" || job.state.status === statusFilter || roleMatch;
+      if (!companyStatusMatch) return false;
+      if (!text) return true;
+      return job.company.toLowerCase().includes(text) || job.category.toLowerCase().includes(text) ||
+        (job.country ?? "").toLowerCase().includes(text) || job.roles.toLowerCase().includes(text) || roleMatch;
+    }).sort((a, b) => a.company.localeCompare(b.company));
+  }, [enriched, query, statusFilter]);
+
+  const selected = enriched.find((job) => job.id === selectedId)
+    ?? enriched.find((job) => job.company.toLowerCase().includes("rbc"))
+    ?? filtered[0]
+    ?? enriched[0];
+
+  const dateRows = useMemo(() => enriched.flatMap((job) => {
+    const roleRows = job.roleStates.map(({ role, state }) => ({ job, role, state }));
+    const companyRow = (job.state.opensOn || job.state.closesOn || job.state.appliedOn)
+      ? [{ job, role: undefined, state: job.state }]
+      : [];
+    return [...roleRows, ...companyRow];
+  }).filter(({ job, role, state }) => {
+    const text = query.trim().toLowerCase();
+    if (statusFilter !== "all" && state.status !== statusFilter) return false;
+    if (!text) return true;
+    return job.company.toLowerCase().includes(text) || role?.title.toLowerCase().includes(text);
+  }).sort((a, b) => {
+    const aDate = a.state.closesOn || a.state.opensOn || a.state.appliedOn || "9999-12-31";
+    const bDate = b.state.closesOn || b.state.opensOn || b.state.appliedOn || "9999-12-31";
+    return aDate.localeCompare(bDate);
+  }), [enriched, query, statusFilter]);
+
+  const exportCsv = () => {
+    const headers = ["Company", "Role", "Country", "Category", "Status", "Applied Date", "Opening Date", "Closing Date", "Resume Ready", "Resume File", "Job Link", "Notes"];
+    const rows = enriched.flatMap((job) => {
+      const roleRows = job.roleStates.length > 0
+        ? job.roleStates
+        : [{ role: { id: job.id, title: job.roles, link: job.link }, state: job.state }];
+      return roleRows.map(({ role, state }) => [
+        job.company, role.title, job.country ?? "", job.category, STATUS_META[state.status].label,
+        state.appliedOn ?? "", state.opensOn ?? "", state.closesOn ?? "", state.resumeReady ? "Yes" : "No",
+        state.resumeFile?.name ?? "", role.link ?? job.link, state.notes ?? job.notes,
+      ]);
+    });
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `job-applications-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!tracker.hydrated) return null;
 
   return (
-    <Dialog>
-      <div
-        className="group rounded-lg bg-card border border-border p-4 relative overflow-hidden transition-colors hover:border-primary/60"
-        style={{ boxShadow: state.status === "offer" ? `0 10px 40px -10px ${meta.color}` : undefined }}
-      >
-        <div
-          className="absolute top-0 left-0 right-0 h-1"
-          style={{ background: meta.color, opacity: state.status === "not-started" ? 0.3 : 1 }}
-        />
-        <div className="flex items-start gap-3">
-          <div
-            className="h-11 w-11 rounded-xl flex items-center justify-center font-black text-sm shrink-0"
-            style={{ background: `color-mix(in oklab, ${meta.color} 45%, transparent)`, color: "var(--foreground)" }}
-          >
-            {initials}
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div>
+            <h1 className="text-xl font-bold">Job Hunt HQ</h1>
+            <p className="text-xs text-muted-foreground">Application workspace</p>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h4 className="font-bold truncate">{job.company}</h4>
-              <a
-                href={job.link}
-                target="_blank"
-                rel="noreferrer"
-                className="text-muted-foreground hover:text-primary shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {job.category}{job.country ? ` · ${job.country}` : ""}
-            </p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <Button onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" />Add company</Button>
           </div>
         </div>
+      </header>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Badge
-            variant="secondary"
-            className="text-xs rounded-full border-0"
-            style={{ background: `color-mix(in oklab, ${meta.color} 40%, transparent)`, color: "var(--foreground)" }}
-          >
-            {meta.emoji} {meta.label}
-          </Badge>
-          <Badge
-            variant="secondary"
-            className="text-xs rounded-full border-0"
-            style={{
-              background: state.resumeReady
-                ? "color-mix(in oklab, var(--success) 40%, transparent)"
-                : "color-mix(in oklab, var(--warning) 40%, transparent)",
-              color: "var(--foreground)",
-            }}
-          >
-            {state.resumeReady ? (
-              <>
-                <FileCheck2 className="h-3 w-3 mr-1" /> {state.resumeFile ? state.resumeFile.name.slice(0, 14) : "Resume"}
-              </>
-            ) : (
-              <>
-                <FileX2 className="h-3 w-3 mr-1" /> No resume
-              </>
-            )}
-          </Badge>
-        </div>
-
-        {roles.length > 0 ? (
-          <div className="mt-3 space-y-1">
-            {roles.slice(0, 3).map((r) => {
-              const rs = get(roleKey(job.id, r.id));
-              return (
-                <div key={r.id} className="flex items-center gap-2 text-xs">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: STATUS_META[rs.status].color }} />
-                  <span className="truncate flex-1">{r.title}</span>
-                  <span className="text-muted-foreground shrink-0">{rs.resumeReady ? "📎" : "📝"}</span>
-                </div>
-              );
-            })}
-            {roles.length > 3 && (
-              <p className="text-xs text-muted-foreground">+{roles.length - 3} more roles</p>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
-        )}
-
-        {(state.opensOn || state.closesOn) && (
-          <div className="mt-3 text-xs flex items-center gap-2 text-muted-foreground">
-            <CalendarDays className="h-3 w-3" />
-            {state.opensOn && <span>Opens {state.opensOn}</span>}
-            {state.opensOn && state.closesOn && <span>·</span>}
-            {state.closesOn && <span>Closes {state.closesOn}</span>}
-          </div>
-        )}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <DialogTrigger asChild>
-            <Button size="sm" variant="secondary" className="rounded-lg text-xs">
-              <Briefcase className="h-3.5 w-3.5 mr-1" /> Roles {roles.length > 0 ? `(${roles.length})` : ""}
-            </Button>
-          </DialogTrigger>
-          <Button
-            size="sm"
-            variant={state.resumeReady ? "default" : "outline"}
-            className="rounded-lg text-xs"
-            onClick={() => onChange({ resumeReady: !state.resumeReady })}
-          >
-            {state.resumeReady ? "✓ Ready" : "Mark ready"}
+      <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6">
+        <div className="mb-5 flex flex-wrap items-center gap-3 border-b">
+          <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${view === "companies" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => setView("companies")}>
+            <Building2 className="mr-2 h-4 w-4" />Companies
+          </Button>
+          <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${view === "dates" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => setView("dates")}>
+            <CalendarDays className="mr-2 h-4 w-4" />Dates
           </Button>
         </div>
-      </div>
 
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
-            {job.company}
-            {onDelete && (
-              <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto" onClick={onDelete}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            )}
-          </DialogTitle>
-          <DialogDescription>
-            {job.category} · {job.roles}{job.country ? ` · 📍 ${job.country}` : ""}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <RolesSection
-            jobId={job.id}
-            suggested={suggested}
-            roles={roles}
-            get={get}
-            update={update}
-            addRole={addRole}
-            removeRole={removeRole}
-          />
-
-          <div className="border-t border-border/60 pt-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Company-level status
-            </label>
-            <div className="mt-2">
-              <StatusButtons value={state.status} onChange={(s) => onChange({ status: s })} />
-            </div>
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search companies or roles" className="h-10 rounded-md pl-9" />
           </div>
-
-          <ResumeUploader state={state} onChange={onChange} idSuffix={job.id} />
-
-          <div className="grid grid-cols-2 gap-3">
-            <DateField label="Opens" value={state.opensOn} onChange={(v) => onChange({ opensOn: v })} />
-            <DateField label="Closes" value={state.closesOn} onChange={(v) => onChange({ closesOn: v })} />
-          </div>
-          <DateField label="Applied on" value={state.appliedOn} onChange={(v) => onChange({ appliedOn: v })} />
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your notes</label>
-            <Textarea
-              value={state.notes ?? ""}
-              onChange={(e) => onChange({ notes: e.target.value })}
-              placeholder="Referrals, recruiter contacts, interview prep…"
-              rows={3}
-              className="mt-1"
-            />
-          </div>
-
-          {state.timeline && state.timeline.length > 0 && (
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your journey</label>
-              <ol className="mt-2 space-y-2 relative border-l-2 border-border/60 pl-4">
-                {state.timeline.map((t, i) => (
-                  <li key={i} className="text-xs relative">
-                    <span
-                      className="absolute -left-[21px] top-1 h-3 w-3 rounded-full border-2 border-background"
-                      style={{ background: STATUS_META[t.status].color }}
-                    />
-                    <span className="font-semibold">{STATUS_META[t.status].emoji} {STATUS_META[t.status].label}</span>
-                    <span className="text-muted-foreground ml-2">{t.date}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          <div className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-            <strong className="text-foreground">Recon:</strong> {job.notes}
-          </div>
-
-          <a
-            href={job.link}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-          >
-            Open careers page <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-10 w-[180px] rounded-md"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {(Object.keys(STATUS_META) as AppStatus[]).map((status) => <SelectItem key={status} value={status}>{STATUS_META[status].label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {view === "companies" ? (
+          <div className="grid min-h-[680px] overflow-hidden rounded-md border bg-card lg:grid-cols-[320px_1fr]">
+            <aside className="border-b lg:border-b-0 lg:border-r">
+              <div className="border-b px-4 py-3">
+                <p className="text-sm font-semibold">Companies</p>
+                <p className="text-xs text-muted-foreground">{filtered.length} results</p>
+              </div>
+              <div className="max-h-[680px] overflow-y-auto">
+                {filtered.map((job) => (
+                  <Button key={job.id} variant="ghost" onClick={() => setSelectedId(job.id)} className={`h-auto w-full justify-start rounded-none border-b px-4 py-3 text-left ${selected?.id === job.id ? "bg-accent" : ""}`}>
+                    <span className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-bold">{job.company.slice(0, 2).toUpperCase()}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{job.company}</span>
+                        <span className="block truncate text-xs font-normal text-muted-foreground">{job.roles_tracked.length} tracked roles · {job.country ?? "Canada"}</span>
+                      </span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </aside>
+            {selected ? (
+              <CompanyWorkspace
+                job={selected}
+                get={tracker.get}
+                update={tracker.update}
+                addRole={tracker.addRole}
+                removeRole={tracker.removeRole}
+                onDelete={selected.id.startsWith("custom-") ? () => tracker.removeCustomJob(selected.id) : undefined}
+              />
+            ) : <div className="p-8 text-sm text-muted-foreground">No company matches your search.</div>}
+          </div>
+        ) : <DatesWorkspace rows={dateRows} />}
+      </main>
+      <AddJobDialog open={addOpen} onOpenChange={setAddOpen} onAdd={tracker.addCustomJob} />
+    </div>
   );
 }
 
-function AddJobDialog({
-  open,
-  onOpenChange,
-  onAdd,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onAdd: (job: Omit<Job, "id">) => string;
+function CompanyWorkspace({ job, get, update, addRole, removeRole, onDelete }: {
+  job: EnrichedJob;
+  get: (id: string) => JobState;
+  update: (id: string, patch: Partial<JobState>) => void;
+  addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
+  removeRole: (jobId: string, roleId: string) => void;
+  onDelete?: () => void;
 }) {
+  const suggested = job.roles.split(/,|\//).map((role) => role.trim()).filter(Boolean);
+  return (
+    <section className="min-w-0 p-5 sm:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">{job.company}</h2>
+            <a href={job.link} target="_blank" rel="noreferrer" aria-label={`Open ${job.company} careers page`} className="text-muted-foreground hover:text-primary"><ExternalLink className="h-4 w-4" /></a>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{job.category} · {job.country ?? "Canada"}</p>
+        </div>
+        {onDelete && <Button size="icon" variant="ghost" onClick={onDelete} aria-label="Delete company"><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+      </div>
+
+      <div className="grid gap-6 py-6 xl:grid-cols-[1fr_280px]">
+        <div>
+          <RolesSection jobId={job.id} suggested={suggested} roles={job.roles_tracked} get={get} update={update} addRole={addRole} removeRole={removeRole} />
+        </div>
+        <aside className="space-y-5 border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Company status</p>
+            <StatusButtons value={job.state.status} onChange={(status) => update(job.id, { status })} compact />
+          </div>
+          <ResumeUploader state={job.state} onChange={(patch) => update(job.id, patch)} idSuffix={job.id} />
+          <div className="grid grid-cols-2 gap-2">
+            <DateField label="Opens" value={job.state.opensOn} onChange={(opensOn) => update(job.id, { opensOn })} />
+            <DateField label="Closes" value={job.state.closesOn} onChange={(closesOn) => update(job.id, { closesOn })} />
+          </div>
+          <DateField label="Applied" value={job.state.appliedOn} onChange={(appliedOn) => update(job.id, { appliedOn })} />
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Notes</label>
+            <Textarea className="mt-1" rows={4} value={job.state.notes ?? ""} onChange={(event) => update(job.id, { notes: event.target.value })} placeholder="Recruiter, referral, interview notes" />
+          </div>
+        </aside>
+      </div>
+      {job.notes && <div className="border-t pt-4 text-sm text-muted-foreground"><span className="font-semibold text-foreground">Company notes:</span> {job.notes}</div>}
+    </section>
+  );
+}
+
+function DatesWorkspace({ rows }: { rows: { job: EnrichedJob; role?: Role; state: JobState }[] }) {
+  return (
+    <section className="overflow-hidden rounded-md border bg-card">
+      <div className="border-b px-5 py-4">
+        <h2 className="font-semibold">Application dates</h2>
+        <p className="text-xs text-muted-foreground">Opening, closing, and submitted dates in one place</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+            <tr><th className="px-4 py-3">Company</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Opens</th><th className="px-4 py-3">Closes</th><th className="px-4 py-3">Applied</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Resume</th></tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map(({ job, role, state }, index) => (
+              <tr key={`${job.id}-${role?.id ?? "company"}-${index}`}>
+                <td className="px-4 py-3 font-semibold">{job.company}</td>
+                <td className="px-4 py-3">{role?.title ?? "Company level"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{state.opensOn || "Not set"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{state.closesOn || "Not set"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{state.appliedOn || "Not set"}</td>
+                <td className="px-4 py-3">{STATUS_META[state.status].label}</td>
+                <td className="px-4 py-3">{state.resumeReady ? <span className="inline-flex items-center gap-1"><FileText className="h-4 w-4" />Ready</span> : "Needed"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No roles or dates match your filters.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function AddJobDialog({ open, onOpenChange, onAdd }: { open: boolean; onOpenChange: (value: boolean) => void; onAdd: (job: Omit<Job, "id">) => string }) {
   const [company, setCompany] = useState("");
   const [category, setCategory] = useState("");
   const [country, setCountry] = useState("");
   const [roles, setRoles] = useState("");
   const [link, setLink] = useState("");
   const [notes, setNotes] = useState("");
-
   const submit = () => {
     if (!company.trim()) return;
-    onAdd({
-      company: company.trim(),
-      category: category.trim() || "Custom",
-      country: country.trim() || "Other",
-      roles: roles.trim() || "—",
-      link: link.trim() || "#",
-      notes: notes.trim(),
-    });
-    setCompany(""); setCategory(""); setCountry(""); setRoles(""); setLink(""); setNotes("");
-    onOpenChange(false);
+    onAdd({ company: company.trim(), category: category.trim() || "Other", country: country.trim() || "Other", roles: roles.trim() || "Add a role", link: link.trim() || "#", notes: notes.trim() });
+    setCompany(""); setCategory(""); setCountry(""); setRoles(""); setLink(""); setNotes(""); onOpenChange(false);
   };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Add a new dream job 🌷</DialogTitle>
-          <DialogDescription>Track a company from anywhere in the world.</DialogDescription>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Add company</DialogTitle><DialogDescription>Create a company record, then add each role inside it.</DialogDescription></DialogHeader>
         <div className="space-y-3">
-          <LabeledInput label="Company *" value={company} onChange={setCompany} placeholder="Stripe" />
-          <div className="grid grid-cols-2 gap-3">
-            <LabeledInput label="Country" value={country} onChange={setCountry} placeholder="USA, UK, Germany…" />
-            <LabeledInput label="Category" value={category} onChange={setCategory} placeholder="Fintech, AI, Startup…" />
-          </div>
-          <LabeledInput label="Target roles" value={roles} onChange={setRoles} placeholder="SWE, PM, Data Scientist" />
-          <LabeledInput label="Careers link" value={link} onChange={setLink} placeholder="https://…" />
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
-          </div>
+          <LabeledInput label="Company *" value={company} onChange={setCompany} placeholder="Company name" />
+          <div className="grid grid-cols-2 gap-3"><LabeledInput label="Country" value={country} onChange={setCountry} /><LabeledInput label="Category" value={category} onChange={setCategory} /></div>
+          <LabeledInput label="Suggested roles" value={roles} onChange={setRoles} placeholder="Analyst, Product Manager" />
+          <LabeledInput label="Careers page" value={link} onChange={setLink} placeholder="https://" />
+          <div><label className="text-xs font-semibold uppercase text-muted-foreground">Notes</label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} className="mt-1" /></div>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit}>
-            <Plus className="h-4 w-4 mr-1" /> Add job
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-
-function TimelineDialog({
-  open,
-  onOpenChange,
-  jobs,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  jobs: EnrichedJob[];
-}) {
-  const events = useMemo(() => {
-    const list: { date: string; company: string; role?: string; status: AppStatus }[] = [];
-    for (const j of jobs) {
-      for (const t of j.state.timeline ?? []) {
-        list.push({ date: t.date, company: j.company, status: t.status });
-      }
-      for (const rs of j.roleStates) {
-        for (const t of rs.state.timeline ?? []) {
-          list.push({ date: t.date, company: j.company, role: rs.role.title, status: t.status });
-        }
-      }
-    }
-    return list.sort((a, b) => b.date.localeCompare(a.date));
-  }, [jobs]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Your application journey 🌸</DialogTitle>
-          <DialogDescription>Every status change, logged automatically.</DialogDescription>
-        </DialogHeader>
-        {events.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No events yet. Update a job status to start your timeline. 💌
-          </p>
-        ) : (
-          <ol className="relative border-l-2 border-border/60 pl-5 space-y-4">
-            {events.map((e, i) => (
-              <li key={i} className="relative">
-                <span
-                  className="absolute -left-[27px] top-1 h-4 w-4 rounded-full border-2 border-background"
-                  style={{ background: STATUS_META[e.status].color }}
-                />
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="font-semibold text-sm">
-                    {STATUS_META[e.status].emoji} {e.company}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{e.date}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {e.role ? `${e.role} · ` : ""}{STATUS_META[e.status].label}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
+        <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={submit}><Plus className="mr-2 h-4 w-4" />Add company</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

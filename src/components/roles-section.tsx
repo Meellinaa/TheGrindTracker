@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
@@ -42,16 +41,14 @@ export function RolesSection({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Roles at this company
-        </label>
+      <div className="flex items-baseline justify-between border-b pb-2">
+        <h3 className="text-sm font-semibold">Roles at this company</h3>
         <span className="text-xs text-muted-foreground">{roles.length} tracked</span>
       </div>
 
       {roles.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          No roles yet — add each posting you apply to and track them separately. 🌸
+          No roles yet. Add each job posting here to track it separately.
         </p>
       )}
 
@@ -62,39 +59,19 @@ export function RolesSection({
           const meta = STATUS_META[st.status];
           const open = openId === r.id;
           return (
-            <div key={r.id} className="rounded-xl border border-border/60 bg-card/60 overflow-hidden">
-              <div className="absolute-none h-1 w-full" style={{ background: meta.color, opacity: st.status === "not-started" ? 0.3 : 1 }} />
+            <div key={r.id} className="rounded-md border border-border bg-card overflow-hidden">
               <div className="p-3">
                 <div className="flex items-start gap-2">
-                  <button className="min-w-0 flex-1 text-left" onClick={() => setOpenId(open ? null : r.id)}>
+                  <Button variant="ghost" className="h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left hover:bg-transparent" onClick={() => setOpenId(open ? null : r.id)}>
+                    <span className="min-w-0">
                     <p className="font-semibold text-sm truncate">{r.title}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      <Badge
-                        variant="secondary"
-                        className="text-[11px] rounded-full border-0"
-                        style={{ background: `color-mix(in oklab, ${meta.color} 40%, transparent)`, color: "var(--foreground)" }}
-                      >
-                        {meta.emoji} {meta.label}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className="text-[11px] rounded-full border-0"
-                        style={{
-                          background: st.resumeReady
-                            ? "color-mix(in oklab, var(--success) 40%, transparent)"
-                            : "color-mix(in oklab, var(--warning) 40%, transparent)",
-                          color: "var(--foreground)",
-                        }}
-                      >
-                        {st.resumeReady ? (st.resumeFile ? `📎 ${st.resumeFile.name.slice(0, 16)}` : "✅ Resume") : "📝 No resume"}
-                      </Badge>
-                      {st.closesOn && (
-                        <Badge variant="secondary" className="text-[11px] rounded-full">
-                          ⏳ closes {st.closesOn}
-                        </Badge>
-                      )}
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-normal text-muted-foreground">
+                      <span>{meta.label}</span>
+                      <span>{st.resumeReady ? (st.resumeFile ? st.resumeFile.name.slice(0, 18) : "Resume ready") : "Resume needed"}</span>
+                      {st.closesOn && <span>Closes {st.closesOn}</span>}
                     </div>
-                  </button>
+                    </span>
+                  </Button>
                   {r.link && (
                     <a href={r.link} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary mt-1">
                       <ExternalLink className="h-3.5 w-3.5" />
@@ -150,13 +127,16 @@ export function RolesSection({
       {quickAdds.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {quickAdds.map((s) => (
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               key={s}
               onClick={() => setOpenId(addRole(jobId, { title: s }))}
-              className="text-xs px-2.5 py-1 rounded-full border border-dashed border-primary/50 text-primary hover:bg-primary/10 transition"
+              className="h-7 text-xs"
             >
               + {s}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -175,7 +155,7 @@ export function RolesSection({
           placeholder="Posting link (optional)"
           className="h-9 text-sm w-[40%]"
         />
-        <Button size="sm" onClick={submit} className="gradient-hero text-primary-foreground border-0 shrink-0">
+        <Button size="sm" onClick={submit} className="shrink-0">
           <Plus className="h-4 w-4" />
         </Button>
       </div>
