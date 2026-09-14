@@ -60,9 +60,11 @@ export function useJobTracker() {
             loadResumeData(id)
               .then((dataUrl) => {
                 if (!dataUrl) return;
-                setMap((prev) =>
-                  prev[id]?.resumeFile ? { ...prev, [id]: { ...prev[id], resumeFile: { ...prev[id].resumeFile!, dataUrl } } } : prev,
-                );
+                setMap((prev) => {
+                  const current = prev[id];
+                  if (!current?.resumeFile) return prev;
+                  return { ...prev, [id]: { ...current, resumeFile: { ...current.resumeFile, dataUrl } } };
+                });
               })
               .catch(() => {});
           }

@@ -9,7 +9,7 @@ import { DateField, LabeledInput, ResumeUploader, StatusButtons } from "@/compon
 import { RolesSection } from "@/components/roles-section";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, CalendarDays, Clock3, Download, ExternalLink, FileText, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, CalendarDays, Download, ExternalLink, FileText, Plus, Search, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
