@@ -175,6 +175,26 @@ function Dashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const { urgent, nextUp } = useMemo(() => {
+    const today = new Date();
+    const soon = new Date(today);
+    soon.setDate(soon.getDate() + 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    let closingCount = 0;
+    let suggestion: string | null = null;
+    for (const j of enriched) {
+      const targets = j.roleStates.length > 0
+        ? j.roleStates.map((rs) => ({ title: `${j.company} — ${rs.role.title}`, state: rs.state }))
+        : [{ title: j.company, state: j.state }];
+      for (const t of targets) {
+        if (t.state.status === "applied" || t.state.status === "interview" || t.state.status === "offer") continue;
+        if (t.state.closesOn && t.state.closesOn >= fmt(today) && t.state.closesOn <= fmt(soon)) closingCount++;
+        if (!suggestion && t.state.status === "not-started") suggestion = t.title;
+      }
+    }
+    return { urgent: closingCount, nextUp: suggestion };
+  }, [enriched]);
+
   if (!hydrated) return null;
 
   return (
