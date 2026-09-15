@@ -7,5 +7,5 @@
 - [x] Make spreadsheet export neat and role-focused
 - [ ] Remove the Made with Lovable badge — blocked by current plan/editor permissions
 - [ ] Publish the update
-- [ ] Restore the preferred lively company card design
-- [ ] Add company role expansion and dates as small changes within that design
+- [x] Restore the preferred lively company card design
+- [x] Add company role expansion and dates as small changes within that design
