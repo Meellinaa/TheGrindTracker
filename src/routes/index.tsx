@@ -208,7 +208,9 @@ function Dashboard() {
         </div>
       </header>
 
-       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+        <ProgressHero stats={stats} />
 
         {/* Filters */}
         <section className="flex flex-wrap gap-3 items-center">
