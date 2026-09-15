@@ -7,6 +7,5 @@
 - [x] Make spreadsheet export neat and role-focused
 - [ ] Remove the Made with Lovable badge — blocked by current plan/editor permissions
 - [ ] Publish the update
-- [ ] Replace the company card grid with a company directory and selected-company workspace
-- [ ] Add a dedicated deadlines view for opening, closing, and applied dates
-- [ ] Restyle the tracker as a restrained productivity tool without AI-like decoration
+- [ ] Restore the preferred lively company card design
+- [ ] Add company role expansion and dates as small changes within that design
