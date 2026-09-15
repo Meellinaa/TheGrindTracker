@@ -130,10 +130,18 @@ function Dashboard() {
     const counts: Record<AppStatus, number> = {
       "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
     };
+    let resumes = 0;
     for (const j of enriched) {
       counts[j.state.status]++;
+      if (j.state.resumeReady) resumes++;
+      for (const rs of j.roleStates) {
+        counts[rs.state.status]++;
+        if (rs.state.resumeReady) resumes++;
+      }
     }
-    return { total: enriched.length, counts };
+    const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
+    const appliedCount = counts.applied + counts.interview + counts.offer;
+    return { total: totalTracked, counts, resumes, appliedCount };
   }, [enriched]);
 
   const exportCsv = () => {
@@ -200,7 +208,9 @@ function Dashboard() {
         </div>
       </header>
 
-       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+        <ProgressHero stats={stats} />
 
         {/* Filters */}
         <section className="flex flex-wrap gap-3 items-center">
@@ -295,6 +305,74 @@ function Dashboard() {
       <AddJobDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCustomJob} />
       <TimelineDialog open={timelineOpen} onOpenChange={setTimelineOpen} jobs={enriched} />
     </div>
+  );
+}
+
+type Stats = {
+  total: number;
+  counts: Record<AppStatus, number>;
+  resumes: number;
+  appliedCount: number;
+};
+
+function motivationFor(pct: number, applied: number): string {
+  if (applied === 0) return "Every journey starts with one application — you've got this! 🌱";
+  if (pct < 25) return "Look at you go! Momentum is building 💪";
+  if (pct < 50) return "Quarter of the way there — keep that energy! ⚡";
+  if (pct < 75) return "Over halfway! Your future self says thanks 💖";
+  if (pct < 100) return "So close to a clean sweep — finish strong! 🏁";
+  return "Full sweep! You've applied everywhere — superstar! 🌟";
+}
+
+function ProgressHero({ stats }: { stats: Stats }) {
+  const pct = stats.total > 0 ? Math.round((stats.appliedCount / stats.total) * 100) : 0;
+  const resumePct = stats.total > 0 ? Math.round((stats.resumes / stats.total) * 100) : 0;
+  const chips: { label: string; count: number; color: string }[] = [
+    { label: "Applied", count: stats.counts.applied, color: STATUS_META.applied.color },
+    { label: "Interview", count: stats.counts.interview, color: STATUS_META.interview.color },
+    { label: "Offer", count: stats.counts.offer, color: STATUS_META.offer.color },
+    { label: "Resumes ready", count: stats.resumes, color: "var(--success)" },
+  ];
+  return (
+    <section className="rounded-2xl border border-border/60 bg-card/70 card-shadow p-4 sm:p-5 space-y-3">
+      <div className="flex items-baseline justify-between flex-wrap gap-1">
+        <p className="font-bold text-sm sm:text-base">{motivationFor(pct, stats.appliedCount)}</p>
+        <p className="text-xs text-muted-foreground">
+          {stats.appliedCount} of {stats.total} applications sent
+        </p>
+      </div>
+      <div
+        className="h-4 rounded-full bg-muted overflow-hidden"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Applications sent"
+      >
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${Math.max(pct, stats.appliedCount > 0 ? 3 : 0)}%`,
+            background:
+              "linear-gradient(90deg, var(--primary), var(--accent), var(--info), var(--success))",
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {chips.map((c) => (
+          <span
+            key={c.label}
+            className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{ background: `color-mix(in oklab, ${c.color} 35%, transparent)` }}
+          >
+            {c.label}: {c.count}
+          </span>
+        ))}
+        <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-muted text-muted-foreground">
+          Resume coverage {resumePct}%
+        </span>
+      </div>
+    </section>
   );
 }
 
