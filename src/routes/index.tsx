@@ -335,6 +335,15 @@ type Stats = {
   appliedCount: number;
 };
 
+const PEP_TALKS = [
+  "Rejection is redirection — every 'no' is one step closer to your 'yes' 💌",
+  "You don't need to be perfect, you just need to hit send ✨",
+  "Someone out there is looking for exactly what you bring 🌷",
+  "Future you is already celebrating — keep going 💖",
+  "One application a day keeps the regret away 🌱",
+  "Your dream role is out there refreshing its inbox too 📬",
+];
+
 function motivationFor(pct: number, applied: number): string {
   if (applied === 0) return "Every journey starts with one application — you've got this! 🌱";
   if (pct < 25) return "Look at you go! Momentum is building 💪";
@@ -344,9 +353,15 @@ function motivationFor(pct: number, applied: number): string {
   return "Full sweep! You've applied everywhere — superstar! 🌟";
 }
 
-function ProgressHero({ stats }: { stats: Stats }) {
+const MILESTONES = [25, 50, 75, 100];
+
+function ProgressHero({ stats, urgent, nextUp }: { stats: Stats; urgent: number; nextUp: string | null }) {
   const pct = stats.total > 0 ? Math.round((stats.appliedCount / stats.total) * 100) : 0;
   const resumePct = stats.total > 0 ? Math.round((stats.resumes / stats.total) * 100) : 0;
+  const nextMilestone = MILESTONES.find((m) => m > pct);
+  const appsToMilestone =
+    nextMilestone != null ? Math.max(1, Math.ceil((nextMilestone / 100) * stats.total) - stats.appliedCount) : 0;
+  const pep = PEP_TALKS[new Date().getDate() % PEP_TALKS.length];
   const chips: { label: string; count: number; color: string }[] = [
     { label: "Applied", count: stats.counts.applied, color: STATUS_META.applied.color },
     { label: "Interview", count: stats.counts.interview, color: STATUS_META.interview.color },
@@ -355,11 +370,17 @@ function ProgressHero({ stats }: { stats: Stats }) {
   ];
   return (
     <section className="rounded-2xl border border-border/60 bg-card/70 card-shadow p-4 sm:p-5 space-y-3">
-      <div className="flex items-baseline justify-between flex-wrap gap-1">
-        <p className="font-bold text-sm sm:text-base">{motivationFor(pct, stats.appliedCount)}</p>
-        <p className="text-xs text-muted-foreground">
-          {stats.appliedCount} of {stats.total} applications sent
-        </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="space-y-0.5">
+          <p className="font-bold text-sm sm:text-base">{motivationFor(pct, stats.appliedCount)}</p>
+          <p className="text-xs text-muted-foreground">{pep}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-3xl sm:text-4xl font-black text-gradient leading-none">{pct}%</p>
+          <p className="text-xs text-muted-foreground">
+            {stats.appliedCount} of {stats.total} sent
+          </p>
+        </div>
       </div>
       <div
         className="h-4 rounded-full bg-muted overflow-hidden"
@@ -391,7 +412,28 @@ function ProgressHero({ stats }: { stats: Stats }) {
         <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-muted text-muted-foreground">
           Resume coverage {resumePct}%
         </span>
+        {nextMilestone != null && stats.appliedCount > 0 && (
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{ background: "color-mix(in oklab, var(--accent) 35%, transparent)" }}
+          >
+            🎯 {appsToMilestone} more to hit {nextMilestone}%
+          </span>
+        )}
+        {urgent > 0 && (
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-semibold"
+            style={{ background: "color-mix(in oklab, var(--warning) 55%, transparent)" }}
+          >
+            ⏰ {urgent} deadline{urgent === 1 ? "" : "s"} closing this week — go go go!
+          </span>
+        )}
       </div>
+      {nextUp && stats.appliedCount < stats.total && (
+        <p className="text-xs text-muted-foreground">
+          💡 Next up idea: <span className="font-semibold text-foreground">{nextUp}</span> is still waiting on you
+        </p>
+      )}
     </section>
   );
 }
