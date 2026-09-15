@@ -130,10 +130,18 @@ function Dashboard() {
     const counts: Record<AppStatus, number> = {
       "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
     };
+    let resumes = 0;
     for (const j of enriched) {
       counts[j.state.status]++;
+      if (j.state.resumeReady) resumes++;
+      for (const rs of j.roleStates) {
+        counts[rs.state.status]++;
+        if (rs.state.resumeReady) resumes++;
+      }
     }
-    return { total: enriched.length, counts };
+    const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
+    const appliedCount = counts.applied + counts.interview + counts.offer;
+    return { total: totalTracked, counts, resumes, appliedCount };
   }, [enriched]);
 
   const exportCsv = () => {
