@@ -9,3 +9,5 @@
 - [ ] Publish the update
 - [x] Restore the preferred lively company card design
 - [x] Add company role expansion and dates as small changes within that design
+- [ ] Separate rejections after an interview from regular rejections
+- [ ] Make interview progress and motivational wins more visible
