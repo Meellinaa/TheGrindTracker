@@ -11,3 +11,5 @@
 - [x] Add company role expansion and dates as small changes within that design
 - [x] Separate rejections after an interview from regular rejections
 - [x] Make interview progress and motivational wins more visible
+- [x] Separate Interviewing, Interviewed, Rejected, and Interviewed + Rejected outcomes
+- [x] Refresh the dashboard as a coral-and-sky tactile bento board

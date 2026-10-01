@@ -132,6 +132,7 @@ function Dashboard() {
       researching: 0,
       applied: 0,
       interview: 0,
+      interviewed: 0,
       offer: 0,
       "rejected-after-interview": 0,
       rejected: 0,
@@ -147,8 +148,9 @@ function Dashboard() {
     }
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
     const appliedCount = counts.applied + counts.interview + counts.offer + counts["rejected-after-interview"] + counts.rejected;
-    const interviewWins = counts.interview + counts.offer + counts["rejected-after-interview"];
-    return { total: totalTracked, counts, resumes, appliedCount, interviewWins };
+    const interviewedCount = counts.interviewed + counts.offer + counts["rejected-after-interview"];
+    const rejectionCount = counts.rejected + counts["rejected-after-interview"];
+    return { total: totalTracked, counts, resumes, appliedCount, interviewedCount, rejectionCount };
   }, [enriched]);
 
   const exportCsv = () => {
@@ -194,7 +196,7 @@ function Dashboard() {
         ? j.roleStates.map((rs) => ({ title: `${j.company} — ${rs.role.title}`, state: rs.state }))
         : [{ title: j.company, state: j.state }];
       for (const t of targets) {
-        if (t.state.status === "applied" || t.state.status === "interview" || t.state.status === "offer") continue;
+        if (["applied", "interview", "interviewed", "offer", "rejected", "rejected-after-interview"].includes(t.state.status)) continue;
         if (t.state.closesOn && t.state.closesOn >= fmt(today) && t.state.closesOn <= fmt(soon)) closingCount++;
         if (!suggestion && t.state.status === "not-started") suggestion = t.title;
       }
@@ -205,17 +207,17 @@ function Dashboard() {
   if (!hydrated) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/40 backdrop-blur-xl sticky top-0 z-40 bg-background/70">
+      <header className="border-b border-border sticky top-0 z-40 bg-background/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-2xl gradient-hero glow flex items-center justify-center animate-float">
+            <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center shadow-sm">
               <Heart className="h-5 w-5 text-primary-foreground" fill="currentColor" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-                Job Hunt <span className="text-gradient">HQ</span> ✨
+              <h1 className="text-2xl sm:text-3xl leading-none" data-display>
+                Job Hunt HQ
               </h1>
                <p className="text-xs text-muted-foreground">Companies, roles, dates, notes, and resumes</p>
             </div>
@@ -235,7 +237,7 @@ function Dashboard() {
         </div>
       </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         <ProgressHero stats={stats} urgent={urgent} nextUp={nextUp} />
 
@@ -247,7 +249,7 @@ function Dashboard() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search company, role, country, notes…"
-              className="pl-9 h-11 rounded-xl bg-card/60 border-border/60"
+              className="pl-9 h-11 rounded-lg bg-card border-border"
             />
           </div>
            <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -260,7 +262,7 @@ function Dashboard() {
              </SelectContent>
            </Select>
           <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[170px]">
+            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[170px]">
               <Globe className="h-4 w-4 mr-1 opacity-60" />
               <SelectValue />
             </SelectTrigger>
@@ -272,7 +274,7 @@ function Dashboard() {
             </SelectContent>
           </Select>
           <Select value={groupFilter} onValueChange={setGroupFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[200px]">
+            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[200px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -283,7 +285,7 @@ function Dashboard() {
             </SelectContent>
           </Select>
           <Select value={resumeFilter} onValueChange={setResumeFilter}>
-            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[180px]">
+            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -296,10 +298,10 @@ function Dashboard() {
 
          <section>
            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Companies A to Z</h2>
+             <h2 className="text-2xl flex items-center gap-2" data-display><Building2 className="h-5 w-5" /> Companies A to Z</h2>
              <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
            </div>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-fr">
               {[...filtered]
                 .sort((a, b) => a.company.localeCompare(b.company))
                 .map((j) => (
@@ -340,7 +342,8 @@ type Stats = {
   counts: Record<AppStatus, number>;
   resumes: number;
   appliedCount: number;
-  interviewWins: number;
+  interviewedCount: number;
+  rejectionCount: number;
 };
 
 const PEP_TALKS = [
@@ -370,95 +373,52 @@ function ProgressHero({ stats, urgent, nextUp }: { stats: Stats; urgent: number;
   const appsToMilestone =
     nextMilestone != null ? Math.max(1, Math.ceil((nextMilestone / 100) * stats.total) - stats.appliedCount) : 0;
   const pep = PEP_TALKS[new Date().getDate() % PEP_TALKS.length];
-  const chips: { label: string; count: number; color: string }[] = [
-    { label: "Applied", count: stats.counts.applied, color: STATUS_META.applied.color },
-    { label: "Interviewing now", count: stats.counts.interview, color: STATUS_META.interview.color },
-    { label: "Offer", count: stats.counts.offer, color: STATUS_META.offer.color },
-    { label: "Resumes ready", count: stats.resumes, color: "var(--success)" },
-  ];
   return (
-    <section className="rounded-2xl border border-border/60 bg-card/70 card-shadow p-4 sm:p-5 space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="space-y-0.5">
-          <p className="font-bold text-sm sm:text-base">{motivationFor(pct, stats.appliedCount)}</p>
-          <p className="text-xs text-muted-foreground">{pep}</p>
+    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Application momentum">
+      <div className="col-span-2 lg:row-span-2 rounded-lg bg-primary text-primary-foreground p-5 sm:p-6 relative overflow-hidden min-h-52 flex flex-col justify-between shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase">Application momentum</p>
+            <p className="text-2xl sm:text-3xl mt-2 leading-tight max-w-md" data-display>{motivationFor(pct, stats.appliedCount)}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-5xl sm:text-6xl leading-none" data-display>{pct}%</p>
+            <p className="text-xs mt-1 opacity-80">{stats.appliedCount} of {stats.total} sent</p>
+          </div>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-3xl sm:text-4xl font-black text-gradient leading-none">{pct}%</p>
-          <p className="text-xs text-muted-foreground">
-            {stats.appliedCount} of {stats.total} sent
-          </p>
-        </div>
-      </div>
-      <div
-        className="h-4 rounded-full bg-muted overflow-hidden"
-        role="progressbar"
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Applications sent"
-      >
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{
-            width: `${Math.max(pct, stats.appliedCount > 0 ? 3 : 0)}%`,
-            background:
-              "linear-gradient(90deg, var(--primary), var(--accent), var(--info), var(--success))",
-          }}
-        />
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {chips.map((c) => (
-          <span
-            key={c.label}
-            className="text-xs px-2.5 py-1 rounded-full font-medium"
-            style={{ background: `color-mix(in oklab, ${c.color} 35%, transparent)` }}
-          >
-            {c.label}: {c.count}
-          </span>
-        ))}
-        <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-muted text-muted-foreground">
-          Resume coverage {resumePct}%
-        </span>
-        {nextMilestone != null && stats.appliedCount > 0 && (
-          <span
-            className="text-xs px-2.5 py-1 rounded-full font-medium"
-            style={{ background: "color-mix(in oklab, var(--accent) 35%, transparent)" }}
-          >
-            🎯 {appsToMilestone} more to hit {nextMilestone}%
-          </span>
-        )}
-        {urgent > 0 && (
-          <span
-            className="text-xs px-2.5 py-1 rounded-full font-semibold"
-            style={{ background: "color-mix(in oklab, var(--warning) 55%, transparent)" }}
-          >
-            ⏰ {urgent} deadline{urgent === 1 ? "" : "s"} closing this week — go go go!
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-        <div className="rounded-lg border border-border/60 bg-secondary/55 p-3">
-          <p className="text-2xl font-black">{stats.interviewWins}</p>
-          <p className="text-xs font-semibold">Interview wins</p>
-          <p className="text-xs text-muted-foreground mt-1">Getting selected is real proof your application worked.</p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-muted/55 p-3">
-          <p className="text-2xl font-black">{stats.counts["rejected-after-interview"]}</p>
-          <p className="text-xs font-semibold">Interview, then closed</p>
-          <p className="text-xs text-muted-foreground mt-1">These still count as interview achievements.</p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-muted/55 p-3">
-          <p className="text-2xl font-black">{stats.counts.rejected}</p>
-          <p className="text-xs font-semibold">Closed before interview</p>
-          <p className="text-xs text-muted-foreground mt-1">Separate from the interviews you earned.</p>
+        <div>
+          <div className="h-2 bg-primary-foreground/25 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Applications sent">
+            <div className="h-full bg-primary-foreground transition-[width] duration-700" style={{ width: `${Math.max(pct, stats.appliedCount > 0 ? 3 : 0)}%` }} />
+          </div>
+          <p className="text-xs mt-3 opacity-85">{pep}</p>
         </div>
       </div>
-      {nextUp && stats.appliedCount < stats.total && (
-        <p className="text-xs text-muted-foreground">
-          💡 Next up idea: <span className="font-semibold text-foreground">{nextUp}</span> is still waiting on you
-        </p>
-      )}
+      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
+        <p className="text-xs font-bold uppercase text-muted-foreground">Interviewing</p>
+        <p className="text-3xl mt-1" data-display>{stats.counts.interview}</p>
+        <p className="text-xs text-muted-foreground mt-1">Conversations in motion</p>
+      </div>
+      <div className="rounded-lg bg-secondary text-secondary-foreground p-4 min-h-24">
+        <p className="text-xs font-bold uppercase">Interviewed</p>
+        <p className="text-3xl mt-1" data-display>{stats.interviewedCount}</p>
+        <p className="text-xs mt-1 opacity-75">You earned every one</p>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
+        <p className="text-xs font-bold uppercase text-muted-foreground">Rejected</p>
+        <p className="text-3xl mt-1" data-display>{stats.rejectionCount}</p>
+        <p className="text-xs text-muted-foreground mt-1">Outcome, not your worth</p>
+      </div>
+      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
+        <p className="text-xs font-bold uppercase text-muted-foreground">Resume coverage</p>
+        <p className="text-3xl mt-1" data-display>{resumePct}%</p>
+        <p className="text-xs text-muted-foreground mt-1">{stats.resumes} ready to send</p>
+      </div>
+      <div className="col-span-2 lg:col-span-4 grid sm:grid-cols-3 border border-border bg-card rounded-lg overflow-hidden text-xs">
+        <p className="p-3 border-b sm:border-b-0 sm:border-r border-border"><strong>Next mark:</strong> {nextMilestone != null ? `${appsToMilestone} more to reach ${nextMilestone}%` : "Every target reached"}</p>
+        <p className="p-3 border-b sm:border-b-0 sm:border-r border-border"><strong>Deadlines:</strong> {urgent > 0 ? `${urgent} closing this week` : "Nothing urgent this week"}</p>
+        <p className="p-3"><strong>Next move:</strong> {nextUp ?? "Review your active applications"}</p>
+      </div>
+      <p className="col-span-2 lg:col-span-4 text-xs text-muted-foreground">“Interviewed + Rejected” counts once as an application, once under Interviewed, and once under Rejected.</p>
     </section>
   );
 }

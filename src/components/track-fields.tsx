@@ -11,6 +11,7 @@ export const STATUSES: AppStatus[] = [
   "researching",
   "applied",
   "interview",
+  "interviewed",
   "offer",
   "rejected-after-interview",
   "rejected",
