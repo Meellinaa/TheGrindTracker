@@ -145,6 +145,7 @@ export type AppStatus =
   | "researching"
   | "applied"
   | "interview"
+  | "interviewed"
   | "offer"
   | "rejected-after-interview"
   | "rejected";
@@ -153,10 +154,11 @@ export const STATUS_META: Record<AppStatus, { label: string; color: string; emoj
   "not-started": { label: "Not Started", color: "oklch(0.78 0.03 320)", emoji: "🤍" },
   researching: { label: "Researching", color: "oklch(0.85 0.11 85)", emoji: "🔍" },
   applied: { label: "Applied", color: "oklch(0.82 0.09 230)", emoji: "💌" },
-  interview: { label: "Interview", color: "oklch(0.82 0.1 300)", emoji: "💬" },
+  interview: { label: "Interviewing", color: "oklch(0.72 0.1 225)", emoji: "💬" },
+  interviewed: { label: "Interviewed", color: "oklch(0.68 0.13 205)", emoji: "✓" },
   offer: { label: "Offer", color: "oklch(0.82 0.11 155)", emoji: "🎀" },
-  "rejected-after-interview": { label: "Interview, then closed", color: "oklch(0.79 0.09 55)", emoji: "🏅" },
-  rejected: { label: "Rejected before interview", color: "oklch(0.78 0.1 25)", emoji: "🥀" },
+  "rejected-after-interview": { label: "Interviewed + Rejected", color: "oklch(0.69 0.15 30)", emoji: "↗" },
+  rejected: { label: "Rejected", color: "oklch(0.7 0.12 25)", emoji: "×" },
 };
 
 export const CATEGORY_GROUPS: Record<string, string> = {
