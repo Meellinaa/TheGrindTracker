@@ -140,7 +140,14 @@ export const JOBS: Job[] = raw.map((j) => ({
   id: j.company.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
 }));
 
-export type AppStatus = "not-started" | "researching" | "applied" | "interview" | "offer" | "rejected";
+export type AppStatus =
+  | "not-started"
+  | "researching"
+  | "applied"
+  | "interview"
+  | "offer"
+  | "rejected-after-interview"
+  | "rejected";
 
 export const STATUS_META: Record<AppStatus, { label: string; color: string; emoji: string }> = {
   "not-started": { label: "Not Started", color: "oklch(0.78 0.03 320)", emoji: "🤍" },
@@ -148,7 +155,8 @@ export const STATUS_META: Record<AppStatus, { label: string; color: string; emoj
   applied: { label: "Applied", color: "oklch(0.82 0.09 230)", emoji: "💌" },
   interview: { label: "Interview", color: "oklch(0.82 0.1 300)", emoji: "💬" },
   offer: { label: "Offer", color: "oklch(0.82 0.11 155)", emoji: "🎀" },
-  rejected: { label: "Rejected", color: "oklch(0.78 0.1 25)", emoji: "🥀" },
+  "rejected-after-interview": { label: "Interview, then closed", color: "oklch(0.79 0.09 55)", emoji: "🏅" },
+  rejected: { label: "Rejected before interview", color: "oklch(0.78 0.1 25)", emoji: "🥀" },
 };
 
 export const CATEGORY_GROUPS: Record<string, string> = {
