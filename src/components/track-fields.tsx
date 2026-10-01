@@ -12,6 +12,7 @@ export const STATUSES: AppStatus[] = [
   "applied",
   "interview",
   "offer",
+  "rejected-after-interview",
   "rejected",
 ];
 
@@ -25,7 +26,7 @@ export function StatusButtons({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "flex flex-wrap gap-1.5" : "grid grid-cols-3 gap-1.5"}>
+    <div className={compact ? "flex flex-wrap gap-1.5" : "grid grid-cols-2 sm:grid-cols-3 gap-1.5"}>
       {STATUSES.map((s) => (
         <button
           key={s}

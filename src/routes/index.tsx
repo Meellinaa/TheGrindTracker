@@ -128,7 +128,13 @@ function Dashboard() {
 
   const stats = useMemo(() => {
     const counts: Record<AppStatus, number> = {
-      "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
+      "not-started": 0,
+      researching: 0,
+      applied: 0,
+      interview: 0,
+      offer: 0,
+      "rejected-after-interview": 0,
+      rejected: 0,
     };
     let resumes = 0;
     for (const j of enriched) {
@@ -140,8 +146,9 @@ function Dashboard() {
       }
     }
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
-    const appliedCount = counts.applied + counts.interview + counts.offer;
-    return { total: totalTracked, counts, resumes, appliedCount };
+    const appliedCount = counts.applied + counts.interview + counts.offer + counts["rejected-after-interview"] + counts.rejected;
+    const interviewWins = counts.interview + counts.offer + counts["rejected-after-interview"];
+    return { total: totalTracked, counts, resumes, appliedCount, interviewWins };
   }, [enriched]);
 
   const exportCsv = () => {
@@ -333,6 +340,7 @@ type Stats = {
   counts: Record<AppStatus, number>;
   resumes: number;
   appliedCount: number;
+  interviewWins: number;
 };
 
 const PEP_TALKS = [
@@ -364,7 +372,7 @@ function ProgressHero({ stats, urgent, nextUp }: { stats: Stats; urgent: number;
   const pep = PEP_TALKS[new Date().getDate() % PEP_TALKS.length];
   const chips: { label: string; count: number; color: string }[] = [
     { label: "Applied", count: stats.counts.applied, color: STATUS_META.applied.color },
-    { label: "Interview", count: stats.counts.interview, color: STATUS_META.interview.color },
+    { label: "Interviewing now", count: stats.counts.interview, color: STATUS_META.interview.color },
     { label: "Offer", count: stats.counts.offer, color: STATUS_META.offer.color },
     { label: "Resumes ready", count: stats.resumes, color: "var(--success)" },
   ];
@@ -428,6 +436,23 @@ function ProgressHero({ stats, urgent, nextUp }: { stats: Stats; urgent: number;
             ⏰ {urgent} deadline{urgent === 1 ? "" : "s"} closing this week — go go go!
           </span>
         )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+        <div className="rounded-lg border border-border/60 bg-secondary/55 p-3">
+          <p className="text-2xl font-black">{stats.interviewWins}</p>
+          <p className="text-xs font-semibold">Interview wins</p>
+          <p className="text-xs text-muted-foreground mt-1">Getting selected is real proof your application worked.</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-muted/55 p-3">
+          <p className="text-2xl font-black">{stats.counts["rejected-after-interview"]}</p>
+          <p className="text-xs font-semibold">Interview, then closed</p>
+          <p className="text-xs text-muted-foreground mt-1">These still count as interview achievements.</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-muted/55 p-3">
+          <p className="text-2xl font-black">{stats.counts.rejected}</p>
+          <p className="text-xs font-semibold">Closed before interview</p>
+          <p className="text-xs text-muted-foreground mt-1">Separate from the interviews you earned.</p>
+        </div>
       </div>
       {nextUp && stats.appliedCount < stats.total && (
         <p className="text-xs text-muted-foreground">
