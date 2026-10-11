@@ -27,9 +27,47 @@ export type Role = {
   location?: string;
 };
 
+export type ApplicationStatus =
+  | "applied"
+  | "screen"
+  | "interviewing"
+  | "interviewed"
+  | "final-round"
+  | "offer"
+  | "rejected";
+
+export type InterviewLog = {
+  questionsAsked: string;
+  wentWell: string;
+  changeNextTime: string;
+};
+
+export type Application = {
+  id: string;
+  sourceKey?: string;
+  company: string;
+  role: string;
+  requirementId: string;
+  dateApplied: string;
+  deadline: string;
+  status: ApplicationStatus;
+  interviewed: boolean;
+  resumeFileName: string;
+  contact: string;
+  lastFollowUpDate: string;
+  eligibility: string;
+  notes: string;
+  responseDate: string;
+  interviewLog: InterviewLog;
+};
+
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
 const ROLES_KEY = "job-tracker-roles-v1";
+const APPLICATIONS_KEY = "job-tracker-applications-v2";
+const CONVERTED_KEY = "job-tracker-converted-companies-v2";
+const MIGRATION_KEY = "job-tracker-applications-migrated-v2";
+const WEEKLY_GOAL_KEY = "job-tracker-weekly-goal-v2";
 
 /** Storage key for a role's own tracking state (reuses the same JobState shape). */
 export const roleKey = (jobId: string, roleId: string) => `${jobId}::${roleId}`;
@@ -43,6 +81,10 @@ export function useJobTracker() {
   const [map, setMap] = useState<Record<string, JobState>>({});
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
   const [rolesByJob, setRolesByJob] = useState<Record<string, Role[]>>({});
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [convertedCompanyIds, setConvertedCompanyIds] = useState<string[]>([]);
+  const [applicationsMigrated, setApplicationsMigrated] = useState(false);
+  const [weeklyGoal, setWeeklyGoalState] = useState(5);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -74,6 +116,13 @@ export function useJobTracker() {
       if (rawC) setCustomJobs(JSON.parse(rawC));
       const rawR = localStorage.getItem(ROLES_KEY);
       if (rawR) setRolesByJob(JSON.parse(rawR));
+      const rawA = localStorage.getItem(APPLICATIONS_KEY);
+      if (rawA) setApplications(JSON.parse(rawA));
+      const rawConverted = localStorage.getItem(CONVERTED_KEY);
+      if (rawConverted) setConvertedCompanyIds(JSON.parse(rawConverted));
+      setApplicationsMigrated(localStorage.getItem(MIGRATION_KEY) === "true");
+      const rawGoal = localStorage.getItem(WEEKLY_GOAL_KEY);
+      if (rawGoal) setWeeklyGoalState(Number(rawGoal) || 5);
     } catch {}
     setHydrated(true);
   }, []);
@@ -104,6 +153,18 @@ export function useJobTracker() {
     if (hydrated) persist(ROLES_KEY, rolesByJob);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesByJob, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) persist(APPLICATIONS_KEY, applications);
+  }, [applications, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) persist(CONVERTED_KEY, convertedCompanyIds);
+  }, [convertedCompanyIds, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) persist(WEEKLY_GOAL_KEY, weeklyGoal);
+  }, [weeklyGoal, hydrated]);
 
   const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
 
@@ -174,6 +235,29 @@ export function useJobTracker() {
 
   const reset = useCallback(() => setMap({}), []);
 
+  const addApplication = useCallback((application: Omit<Application, "id"> & { id?: string }) => {
+    const id = application.id ?? `application-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setApplications((prev) => [...prev, { ...application, id }]);
+    return id;
+  }, []);
+
+  const updateApplication = useCallback((id: string, patch: Partial<Omit<Application, "id">>) => {
+    setApplications((prev) => prev.map((application) => application.id === id ? { ...application, ...patch } : application));
+  }, []);
+
+  const completeApplicationMigration = useCallback((records: Application[], companyIds: string[]) => {
+    setApplications((prev) => prev.length > 0 ? prev : records);
+    setConvertedCompanyIds((prev) => Array.from(new Set([...prev, ...companyIds])));
+    setApplicationsMigrated(true);
+    try {
+      localStorage.setItem(MIGRATION_KEY, "true");
+    } catch {}
+  }, []);
+
+  const setWeeklyGoal = useCallback((goal: number) => {
+    setWeeklyGoalState(Math.max(1, Math.round(goal)));
+  }, []);
+
   return {
     get,
     update,
@@ -188,5 +272,13 @@ export function useJobTracker() {
     removeRole,
     map,
     hydrated,
+    applications,
+    convertedCompanyIds,
+    applicationsMigrated,
+    weeklyGoal,
+    addApplication,
+    updateApplication,
+    completeApplicationMigration,
+    setWeeklyGoal,
   };
 }
