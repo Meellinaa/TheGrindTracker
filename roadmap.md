@@ -13,7 +13,7 @@
 - [x] Make interview progress and motivational wins more visible
 - [x] Separate Interviewing, Interviewed, Rejected, and Interviewed + Rejected outcomes
 - [x] Refresh the dashboard as a coral-and-sky tactile bento board
-- [ ] Preserve the existing visual design and undo the unapproved visual restyle
+- [x] Preserve the existing visual design and undo the unapproved visual restyle
 - [ ] Step 1: split Watchlist and Applications, migrate qualifying rows, merge duplicate companies, and add conversion
 - [ ] Step 2: add complete application fields without deleting existing data
 - [ ] Step 3: replace placeholder progress with real weekly goals, funnel, response metrics, deadlines, and follow-ups

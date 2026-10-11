@@ -51,6 +51,7 @@ export type Application = {
   dateApplied: string;
   deadline: string;
   status: ApplicationStatus;
+  interviewed: boolean;
   resumeFileName: string;
   contact: string;
   lastFollowUpDate: string;

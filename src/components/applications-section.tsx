@@ -97,7 +97,7 @@ export function ApplicationsSection({
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {FUNNEL.map(({ key, label }) => {
-            const count = applications.filter((a) => reached(a.status, key)).length;
+            const count = applications.filter((a) => key === "interviewing" ? (a.interviewed || reached(a.status, key)) : reached(a.status, key)).length;
             const rate = applications.length ? Math.round((count / applications.length) * 100) : 0;
             return <div key={key} className="rounded-lg bg-muted/55 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="font-black text-xl">{count}</p><p className="text-xs">{rate}%</p></div>;
           })}
@@ -147,6 +147,7 @@ function ApplicationEditor({ application, onUpdate }: { application: Application
       <DateInput label="Last follow-up" value={application.lastFollowUpDate} onChange={(lastFollowUpDate) => onUpdate({ lastFollowUpDate })} />
     </div>
     <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label><Select value={application.status} onValueChange={(status) => onUpdate({ status: status as ApplicationStatus })}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+    <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={application.interviewed} onChange={(e) => onUpdate({ interviewed: e.target.checked })} /> Count this as interviewed, even if its final status is rejected</label>
     <div><label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</label><Textarea className="mt-1" value={application.notes} onChange={(e) => onUpdate({ notes: e.target.value })} /></div>
     <div className="rounded-xl border border-border/60 p-3 bg-muted/40 space-y-3"><h4 className="font-semibold">Interview log</h4><Field label="Questions asked" value={application.interviewLog.questionsAsked} onChange={(questionsAsked) => onUpdate({ interviewLog: { ...application.interviewLog, questionsAsked } })} /><Field label="What went well" value={application.interviewLog.wentWell} onChange={(wentWell) => onUpdate({ interviewLog: { ...application.interviewLog, wentWell } })} /><Field label="One thing to change next time" value={application.interviewLog.changeNextTime} onChange={(changeNextTime) => onUpdate({ interviewLog: { ...application.interviewLog, changeNextTime } })} /></div>
     <p className="text-xs text-muted-foreground flex items-center gap-1"><Save className="h-3 w-3" /> Changes save automatically.</p>
