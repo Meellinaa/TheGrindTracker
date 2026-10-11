@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
-import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
+import { useJobTracker, roleKey, type Application, type ApplicationStatus, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { DateField, LabeledInput, ResumeUploader, StatusButtons, STATUSES } from "@/components/track-fields";
 import { RolesSection } from "@/components/roles-section";
+import { ApplicationsSection } from "@/components/applications-section";
 import {
   Select,
   SelectContent,
@@ -70,6 +71,14 @@ function Dashboard() {
     addRole,
     removeRole,
     hydrated,
+    applications,
+    convertedCompanyIds,
+    applicationsMigrated,
+    weeklyGoal,
+    addApplication,
+    updateApplication,
+    completeApplicationMigration,
+    setWeeklyGoal,
   } = useJobTracker();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -78,6 +87,7 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [view, setView] = useState<"watchlist" | "applications">("applications");
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
@@ -95,6 +105,83 @@ function Dashboard() {
       }),
     [allJobs, get, rolesByJob],
   );
+
+  useEffect(() => {
+    if (!hydrated || applicationsMigrated) return;
+    const migratable = new Set<AppStatus>(["applied", "interview", "interviewed", "offer", "rejected", "rejected-after-interview"]);
+    const statusFor = (status: AppStatus): ApplicationStatus => {
+      if (status === "interview") return "interviewing";
+      if (status === "interviewed" || status === "rejected-after-interview") return status === "interviewed" ? "interviewed" : "rejected";
+      if (status === "offer") return "offer";
+      if (status === "rejected") return "rejected";
+      return "applied";
+    };
+    const records: Application[] = [];
+    const converted: string[] = [];
+    const seen = new Set<string>();
+    for (const job of enriched) {
+      const candidates = job.roleStates.length > 0
+        ? job.roleStates.map(({ role, state }) => ({ sourceKey: roleKey(job.id, role.id), role: role.title, state }))
+        : [{ sourceKey: job.id, role: job.roles, state: job.state }];
+      for (const candidate of candidates) {
+        if (!migratable.has(candidate.state.status) || seen.has(candidate.sourceKey)) continue;
+        seen.add(candidate.sourceKey);
+        converted.push(job.id);
+        records.push({
+          id: `migrated-${candidate.sourceKey}`,
+          sourceKey: candidate.sourceKey,
+          company: job.company,
+          role: candidate.role,
+          requirementId: "",
+          dateApplied: candidate.state.appliedOn ?? "",
+          deadline: candidate.state.closesOn ?? "",
+          status: statusFor(candidate.state.status),
+          interviewed: ["interviewed", "offer", "rejected-after-interview"].includes(candidate.state.status),
+          resumeFileName: candidate.state.resumeFile?.name ?? "",
+          contact: "",
+          lastFollowUpDate: "",
+          eligibility: "",
+          notes: candidate.state.notes ?? job.notes,
+          responseDate: "",
+          interviewLog: { questionsAsked: "", wentWell: "", changeNextTime: "" },
+        });
+      }
+    }
+    completeApplicationMigration(records, converted);
+  }, [applicationsMigrated, completeApplicationMigration, enriched, hydrated]);
+
+  const watchlist = useMemo(() => {
+    const converted = new Set(convertedCompanyIds);
+    const byCompany = new Map<string, EnrichedJob>();
+    for (const job of filtered) {
+      if (converted.has(job.id)) continue;
+      const key = job.company.trim().toLowerCase();
+      if (!byCompany.has(key)) byCompany.set(key, job);
+    }
+    return Array.from(byCompany.values());
+  }, [convertedCompanyIds, filtered]);
+
+  const convertToApplication = (job: EnrichedJob) => {
+    addApplication({
+      sourceKey: job.id,
+      company: job.company,
+      role: job.roles.split(/,|\//)[0]?.trim() ?? "",
+      requirementId: "",
+      dateApplied: new Date().toISOString().slice(0, 10),
+      deadline: job.state.closesOn ?? "",
+      status: "applied",
+      interviewed: false,
+      resumeFileName: job.state.resumeFile?.name ?? "",
+      contact: "",
+      lastFollowUpDate: "",
+      eligibility: "",
+      notes: job.state.notes ?? job.notes,
+      responseDate: "",
+      interviewLog: { questionsAsked: "", wentWell: "", changeNextTime: "" },
+    });
+    completeApplicationMigration(applications, [job.id]);
+    setView("applications");
+  };
 
   const groups = useMemo(() => {
     const s = new Set(enriched.map((j) => j.group));
@@ -207,17 +294,17 @@ function Dashboard() {
   if (!hydrated) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-border sticky top-0 z-40 bg-background/95">
+      <header className="border-b border-border/40 backdrop-blur-xl sticky top-0 z-40 bg-background/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+            <div className="h-11 w-11 rounded-2xl gradient-hero glow flex items-center justify-center animate-float">
               <Heart className="h-5 w-5 text-primary-foreground" fill="currentColor" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl leading-none" data-display>
-                Job Hunt HQ
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+                Job Hunt <span className="text-gradient">HQ</span> ✨
               </h1>
                <p className="text-xs text-muted-foreground">Companies, roles, dates, notes, and resumes</p>
             </div>
@@ -237,9 +324,16 @@ function Dashboard() {
         </div>
       </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-        <ProgressHero stats={stats} urgent={urgent} nextUp={nextUp} />
+        <section className="flex gap-2 border-b border-border pb-3">
+          <Button variant={view === "applications" ? "default" : "secondary"} onClick={() => setView("applications")}>Applications ({applications.length})</Button>
+          <Button variant={view === "watchlist" ? "default" : "secondary"} onClick={() => setView("watchlist")}>Watchlist ({watchlist.length})</Button>
+        </section>
+
+        {view === "applications" ? (
+          <ApplicationsSection applications={applications} weeklyGoal={weeklyGoal} onWeeklyGoalChange={setWeeklyGoal} onUpdate={updateApplication} />
+        ) : <>
 
         {/* Filters */}
         <section className="flex flex-wrap gap-3 items-center">
@@ -298,11 +392,11 @@ function Dashboard() {
 
          <section>
            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-             <h2 className="text-2xl flex items-center gap-2" data-display><Building2 className="h-5 w-5" /> Companies A to Z</h2>
-             <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
+             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Watchlist</h2>
+             <span className="text-sm text-muted-foreground">{watchlist.length} companies</span>
            </div>
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-fr">
-              {[...filtered]
+              {[...watchlist]
                 .sort((a, b) => a.company.localeCompare(b.company))
                 .map((j) => (
                   <JobCard
@@ -316,15 +410,18 @@ function Dashboard() {
                     roles={rolesOf(j.id)}
                     addRole={addRole}
                     removeRole={removeRole}
+                    watchlist
+                    onConvert={() => convertToApplication(j)}
                   />
                 ))}
            </div>
-          {filtered.length === 0 && (
+           {watchlist.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               No matches. Adjust your filters or add a new job. 💌
             </div>
           )}
         </section>
+        </>}
 
         <footer className="text-center text-xs text-muted-foreground pt-8 pb-4">
            Your information stays in this browser. Export a spreadsheet backup anytime.
