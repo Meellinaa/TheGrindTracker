@@ -150,16 +150,6 @@ function Dashboard() {
     completeApplicationMigration(records, converted);
   }, [applicationsMigrated, completeApplicationMigration, enriched, hydrated]);
 
-  const watchlist = useMemo(() => {
-    const converted = new Set(convertedCompanyIds);
-    const byCompany = new Map<string, EnrichedJob>();
-    for (const job of filtered) {
-      if (converted.has(job.id)) continue;
-      const key = job.company.trim().toLowerCase();
-      if (!byCompany.has(key)) byCompany.set(key, job);
-    }
-    return Array.from(byCompany.values());
-  }, [convertedCompanyIds, filtered]);
 
   const convertToApplication = (job: EnrichedJob) => {
     addApplication({
@@ -212,6 +202,17 @@ function Dashboard() {
       );
     });
   }, [enriched, query, statusFilter, groupFilter, countryFilter, resumeFilter]);
+
+  const watchlist = useMemo(() => {
+    const converted = new Set(convertedCompanyIds);
+    const byCompany = new Map<string, EnrichedJob>();
+    for (const job of filtered) {
+      if (converted.has(job.id)) continue;
+      const key = job.company.trim().toLowerCase();
+      if (!byCompany.has(key)) byCompany.set(key, job);
+    }
+    return Array.from(byCompany.values());
+  }, [convertedCompanyIds, filtered]);
 
   const stats = useMemo(() => {
     const counts: Record<AppStatus, number> = {
