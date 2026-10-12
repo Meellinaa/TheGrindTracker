@@ -53,6 +53,7 @@ export type Application = {
   status: ApplicationStatus;
   interviewed: boolean;
   resumeFileName: string;
+  resumeVersion: string;
   contact: string;
   lastFollowUpDate: string;
   eligibility: string;
@@ -60,6 +61,14 @@ export type Application = {
   responseDate: string;
   interviewLog: InterviewLog;
 };
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+/** Fill new fields on older rows without dropping any existing values. */
+export const normalizeApplication = (a: Partial<Application> & { id: string }): Application => ({
+  ...(a as Application),
+  dateApplied: a.dateApplied || todayKey(),
+  resumeVersion: a.resumeVersion ?? "",
+});
 
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
@@ -117,7 +126,7 @@ export function useJobTracker() {
       const rawR = localStorage.getItem(ROLES_KEY);
       if (rawR) setRolesByJob(JSON.parse(rawR));
       const rawA = localStorage.getItem(APPLICATIONS_KEY);
-      if (rawA) setApplications(JSON.parse(rawA));
+      if (rawA) setApplications((JSON.parse(rawA) as Application[]).map(normalizeApplication));
       const rawConverted = localStorage.getItem(CONVERTED_KEY);
       if (rawConverted) setConvertedCompanyIds(JSON.parse(rawConverted));
       setApplicationsMigrated(localStorage.getItem(MIGRATION_KEY) === "true");
@@ -235,9 +244,9 @@ export function useJobTracker() {
 
   const reset = useCallback(() => setMap({}), []);
 
-  const addApplication = useCallback((application: Omit<Application, "id"> & { id?: string }) => {
+  const addApplication = useCallback((application: Omit<Application, "id" | "resumeVersion"> & { id?: string; resumeVersion?: string }) => {
     const id = application.id ?? `application-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setApplications((prev) => [...prev, { ...application, id }]);
+    setApplications((prev) => [...prev, normalizeApplication({ ...application, id })]);
     return id;
   }, []);
 
@@ -246,7 +255,7 @@ export function useJobTracker() {
   }, []);
 
   const completeApplicationMigration = useCallback((records: Application[], companyIds: string[]) => {
-    setApplications((prev) => prev.length > 0 ? prev : records);
+    setApplications((prev) => prev.length > 0 ? prev : records.map(normalizeApplication));
     setConvertedCompanyIds((prev) => Array.from(new Set([...prev, ...companyIds])));
     setApplicationsMigrated(true);
     try {
