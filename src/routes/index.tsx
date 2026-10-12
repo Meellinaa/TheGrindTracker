@@ -538,6 +538,8 @@ function JobCard({
   roles,
   addRole,
   removeRole,
+  watchlist,
+  onConvert,
 }: {
   job: EnrichedJob;
   state: JobState;
@@ -548,6 +550,8 @@ function JobCard({
   roles: Role[];
   addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
   removeRole: (jobId: string, roleId: string) => void;
+  watchlist?: boolean;
+  onConvert?: () => void;
 }) {
   const meta = STATUS_META[state.status];
   const initials = job.company.slice(0, 2).toUpperCase();
@@ -588,6 +592,11 @@ function JobCard({
             </p>
           </div>
         </div>
+        {watchlist && onConvert && (
+          <Button size="sm" className="mt-3 w-full" onClick={(e) => { e.stopPropagation(); onConvert(); }}>
+            Convert to application 💌
+          </Button>
+        )}
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Badge
