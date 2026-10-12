@@ -138,6 +138,7 @@ function Dashboard() {
           status: statusFor(candidate.state.status),
           interviewed: ["interviewed", "offer", "rejected-after-interview"].includes(candidate.state.status),
           resumeFileName: candidate.state.resumeFile?.name ?? "",
+          resumeVersion: "",
           contact: "",
           lastFollowUpDate: "",
           eligibility: "",

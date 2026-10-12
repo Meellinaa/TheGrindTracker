@@ -16,19 +16,19 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   rejected: "Rejected",
 };
 
-const FUNNEL: { key: ApplicationStatus; label: string }[] = [
-  { key: "applied", label: "Applied" },
-  { key: "screen", label: "Screen" },
-  { key: "interviewing", label: "Interview" },
-  { key: "final-round", label: "Final round" },
-  { key: "offer", label: "Offer" },
+const FUNNEL: { label: string; match: (a: Application) => boolean }[] = [
+  { label: "Applied only", match: (a) => a.status === "applied" },
+  { label: "Screen", match: (a) => a.status === "screen" },
+  { label: "Interview", match: (a) => a.status === "interviewing" || a.status === "interviewed" },
+  { label: "Final round", match: (a) => a.status === "final-round" },
+  { label: "Offer", match: (a) => a.status === "offer" },
+  { label: "Rejected", match: (a) => a.status === "rejected" },
 ];
 
-function reached(status: ApplicationStatus, stage: ApplicationStatus) {
-  const order: ApplicationStatus[] = ["applied", "screen", "interviewing", "interviewed", "final-round", "offer"];
-  if (status === "rejected") return stage === "applied";
-  return order.indexOf(status) >= order.indexOf(stage);
-}
+const DAY = 86400000;
+const localKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseLocal = (key: string) => { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d); };
+const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
 
 export function ApplicationsSection({
   applications,
@@ -43,13 +43,13 @@ export function ApplicationsSection({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const today = new Date();
-  const todayKey = today.toISOString().slice(0, 10);
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-  const weekKey = weekStart.toISOString().slice(0, 10);
+  const todayKey = localKey(today);
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7));
+  const weekKey = localKey(weekStart);
+  const weekEndKey = localKey(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6));
 
   const metrics = useMemo(() => {
-    const thisWeek = applications.filter((a) => a.dateApplied >= weekKey).length;
+    const thisWeek = applications.filter((a) => a.dateApplied && a.dateApplied >= weekKey && a.dateApplied <= weekEndKey).length;
     const responses = applications.filter((a) => a.responseDate || a.status !== "applied");
     const responseRate = applications.length ? Math.round((responses.length / applications.length) * 100) : 0;
     const responseDays = responses.flatMap((a) => {
@@ -58,24 +58,38 @@ export function ApplicationsSection({
     });
     const averageDays = responseDays.length ? Math.round(responseDays.reduce((sum, days) => sum + days, 0) / responseDays.length) : null;
     const deadlines = applications.filter((a) => a.deadline && a.deadline >= todayKey && !["offer", "rejected"].includes(a.status)).sort((a, b) => a.deadline.localeCompare(b.deadline));
-    const followUps = applications.filter((a) => {
-      if (!a.dateApplied || a.responseDate || a.status !== "applied") return false;
-      const lastContact = a.lastFollowUpDate || a.dateApplied;
-      return (today.getTime() - new Date(lastContact).getTime()) / 86400000 >= 14;
-    });
+    const todayStart = parseLocal(todayKey).getTime();
+    const followUps = applications
+      .filter((a) => a.status === "applied" && !!a.dateApplied && !a.responseDate && (todayStart - parseLocal(a.dateApplied).getTime()) / DAY >= 14)
+      .sort((a, b) => a.dateApplied.localeCompare(b.dateApplied));
     return { thisWeek, responseRate, averageDays, deadlines, followUps };
-  }, [applications, todayKey, weekKey]);
+  }, [applications, todayKey, weekKey, weekEndKey]);
 
   const resumeResults = useMemo(() => {
     const map = new Map<string, { sent: number; replies: number }>();
     for (const application of applications) {
-      if (!application.resumeFileName) continue;
-      const current = map.get(application.resumeFileName) ?? { sent: 0, replies: 0 };
+      const version = (application.resumeVersion ?? "").trim();
+      if (!version) continue;
+      const current = map.get(version) ?? { sent: 0, replies: 0 };
       current.sent++;
       if (application.responseDate || application.status !== "applied") current.replies++;
-      map.set(application.resumeFileName, current);
+      map.set(version, current);
     }
     return Array.from(map.entries());
+  }, [applications]);
+
+  const flags = useMemo(() => {
+    const out = new Map<string, string[]>();
+    const groups = new Map<string, string[]>();
+    for (const a of applications) {
+      const role = a.role.trim();
+      if (!role || role === "—" || role === "-" || role === "–") out.set(a.id, ["Missing role title"]);
+      if (!role || role === "—") continue;
+      const key = `${norm(a.company)}|${norm(role)}|${norm(a.requirementId)}`;
+      groups.set(key, [...(groups.get(key) ?? []), a.id]);
+    }
+    for (const ids of groups.values()) if (ids.length > 1) for (const id of ids) out.set(id, [...(out.get(id) ?? []), `Possible duplicate (${ids.length} rows)`]);
+    return out;
   }, [applications]);
 
   return (
@@ -95,11 +109,11 @@ export function ApplicationsSection({
         <div className="h-3 rounded-full bg-muted overflow-hidden">
           <div className="h-full gradient-hero transition-all" style={{ width: `${Math.min(100, Math.round((metrics.thisWeek / weeklyGoal) * 100))}%` }} />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {FUNNEL.map(({ key, label }) => {
-            const count = applications.filter((a) => key === "interviewing" ? (a.interviewed || reached(a.status, key)) : reached(a.status, key)).length;
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {FUNNEL.map(({ label, match }) => {
+            const count = applications.filter(match).length;
             const rate = applications.length ? Math.round((count / applications.length) * 100) : 0;
-            return <div key={key} className="rounded-lg bg-muted/55 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="font-black text-xl">{count}</p><p className="text-xs">{rate}%</p></div>;
+            return <div key={label} className="rounded-lg bg-muted/55 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="font-black text-xl">{count}</p><p className="text-xs">{rate}%</p></div>;
           })}
         </div>
         <div className="grid sm:grid-cols-2 gap-2">
@@ -110,7 +124,7 @@ export function ApplicationsSection({
 
       <div className="grid lg:grid-cols-2 gap-4">
         <section className="rounded-lg border border-border bg-card p-4"><h3 className="font-bold flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Open deadlines</h3>{metrics.deadlines.length ? <div className="mt-3 space-y-2">{metrics.deadlines.map((a) => <div key={a.id} className="flex justify-between gap-3 text-sm"><span className="truncate">{a.company} · {a.role}</span><span className="text-muted-foreground shrink-0">{a.deadline}</span></div>)}</div> : <p className="text-sm text-muted-foreground mt-3">No open deadlines added yet.</p>}</section>
-        <section className="rounded-lg border border-border bg-card p-4"><h3 className="font-bold flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Needs follow-up</h3>{metrics.followUps.length ? <div className="mt-3 space-y-2">{metrics.followUps.map((a) => <div key={a.id} className="text-sm">{a.company} · {a.role}</div>)}</div> : <p className="text-sm text-muted-foreground mt-3">You are caught up. Nothing is overdue.</p>}</section>
+        <section className="rounded-lg border border-border bg-card p-4"><h3 className="font-bold flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Needs follow-up</h3>{metrics.followUps.length ? <div className="mt-3 space-y-2">{metrics.followUps.map((a) => <div key={a.id} className="flex justify-between gap-3 text-sm"><span className="truncate">{a.company} · {a.role}</span><span className="text-muted-foreground shrink-0">applied {a.dateApplied}</span></div>)}</div> : <p className="text-sm text-muted-foreground mt-3">You are caught up. Nothing is overdue.</p>}</section>
       </div>
 
       <section>
@@ -119,7 +133,7 @@ export function ApplicationsSection({
           {applications.map((application) => {
             const open = openId === application.id;
             return <div key={application.id} className="rounded-lg bg-card border border-border overflow-hidden">
-              <div className="p-4 flex items-start gap-3"><div className="min-w-0 flex-1"><h3 className="font-bold">{application.company}</h3><p className="text-sm text-muted-foreground">{application.role || "Role not added"} · {STATUS_LABELS[application.status]}</p></div><Button size="icon" variant="ghost" onClick={() => setOpenId(open ? null : application.id)} aria-label={open ? "Close application" : "Edit application"}>{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div>
+              <div className="p-4 flex items-start gap-3"><div className="min-w-0 flex-1"><h3 className="font-bold">{application.company}</h3><p className="text-sm text-muted-foreground">{application.role || "Role not added"} · {STATUS_LABELS[application.status]} · applied {application.dateApplied || "date not set"}</p>{flags.get(application.id)?.map((f) => <p key={f} className="text-xs font-semibold text-destructive mt-1">⚠ {f}, please check</p>)}</div><Button size="icon" variant="ghost" onClick={() => setOpenId(open ? null : application.id)} aria-label={open ? "Close application" : "Edit application"}>{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div>
               {open && <ApplicationEditor application={application} onUpdate={(patch) => onUpdate(application.id, patch)} />}
             </div>;
           })}
@@ -127,7 +141,7 @@ export function ApplicationsSection({
         </div>
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4"><h3 className="font-bold flex items-center gap-2"><FileText className="h-4 w-4" /> Resume reply comparison</h3>{resumeResults.length ? <div className="mt-3 space-y-2">{resumeResults.map(([name, result]) => <div key={name} className="grid grid-cols-[1fr_auto] gap-3 text-sm"><span className="truncate">{name}</span><span>{result.replies} replies / {result.sent} sent · {Math.round((result.replies / result.sent) * 100)}%</span></div>)}</div> : <p className="text-sm text-muted-foreground mt-3">Resume results will appear after applications have resume file names.</p>}</section>
+      <section className="rounded-lg border border-border bg-card p-4"><h3 className="font-bold flex items-center gap-2"><FileText className="h-4 w-4" /> Resume reply comparison</h3>{resumeResults.length ? <div className="mt-3 space-y-2">{resumeResults.map(([name, result]) => <div key={name} className="grid grid-cols-[1fr_auto] gap-3 text-sm"><span className="truncate">{name}</span><span>{result.replies} replies / {result.sent} sent · {Math.round((result.replies / result.sent) * 100)}%</span></div>)}</div> : <p className="text-sm text-muted-foreground mt-3">Resume results will appear after applications have a resume version.</p>}</section>
     </div>
   );
 }
@@ -139,6 +153,7 @@ function ApplicationEditor({ application, onUpdate }: { application: Application
       <Field label="Role" value={application.role} onChange={(role) => onUpdate({ role })} />
       <Field label="Requirement ID" value={application.requirementId} onChange={(requirementId) => onUpdate({ requirementId })} />
       <Field label="Resume file name" value={application.resumeFileName} onChange={(resumeFileName) => onUpdate({ resumeFileName })} />
+      <Field label="Resume version" value={application.resumeVersion ?? ""} onChange={(resumeVersion) => onUpdate({ resumeVersion })} placeholder="v2 data analyst" />
       <Field label="Contact or referrer" value={application.contact} onChange={(contact) => onUpdate({ contact })} />
       <Field label="Eligibility" value={application.eligibility} onChange={(eligibility) => onUpdate({ eligibility })} placeholder="PR required" />
       <DateInput label="Date applied" value={application.dateApplied} onChange={(dateApplied) => onUpdate({ dateApplied })} />
