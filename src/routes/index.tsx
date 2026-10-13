@@ -128,7 +128,8 @@ function Dashboard() {
 
   const stats = useMemo(() => {
     const counts: Record<AppStatus, number> = {
-      "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
+      "not-started": 0, researching: 0, applied: 0, interview: 0, interviewed: 0, offer: 0, rejected: 0,
+      "rejected-after-interview": 0,
     };
     let resumes = 0;
     for (const j of enriched) {
@@ -140,7 +141,8 @@ function Dashboard() {
       }
     }
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
-    const appliedCount = counts.applied + counts.interview + counts.offer;
+    const appliedCount =
+      counts.applied + counts.interview + counts.interviewed + counts.offer + counts["rejected-after-interview"];
     return { total: totalTracked, counts, resumes, appliedCount };
   }, [enriched]);
 

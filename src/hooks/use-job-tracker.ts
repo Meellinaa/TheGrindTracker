@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import type { AppStatus, Job } from "@/data/jobs";
+import { safeStatus, type AppStatus, type Job } from "@/data/jobs";
 import { saveResumeData, loadResumeData, deleteResumeData } from "@/lib/resume-store";
 
 /** Strip big base64 payloads before writing to localStorage (files live in IndexedDB). */
@@ -105,7 +105,13 @@ export function useJobTracker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesByJob, hydrated]);
 
-  const get = useCallback((id: string): JobState => map[id] ?? defaultState, [map]);
+  const get = useCallback((id: string): JobState => {
+    const s = map[id];
+    if (!s) return defaultState;
+    const status = safeStatus(s.status);
+    const timeline = s.timeline?.map((t) => ({ ...t, status: safeStatus(t.status) }));
+    return { ...s, status, resumeReady: !!s.resumeReady, timeline };
+  }, [map]);
 
   const update = useCallback((id: string, patch: Partial<JobState>) => {
     if ("resumeFile" in patch) {
