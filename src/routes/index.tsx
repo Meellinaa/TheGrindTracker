@@ -1,14 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
-import { useJobTracker, roleKey, type Application, type ApplicationStatus, type JobState, type Role } from "@/hooks/use-job-tracker";
+import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { DateField, LabeledInput, ResumeUploader, StatusButtons, STATUSES } from "@/components/track-fields";
 import { RolesSection } from "@/components/roles-section";
-import { ApplicationsSection } from "@/components/applications-section";
 import {
   Select,
   SelectContent,
@@ -71,14 +70,6 @@ function Dashboard() {
     addRole,
     removeRole,
     hydrated,
-    applications,
-    convertedCompanyIds,
-    applicationsMigrated,
-    weeklyGoal,
-    addApplication,
-    updateApplication,
-    completeApplicationMigration,
-    setWeeklyGoal,
   } = useJobTracker();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -87,7 +78,6 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [view, setView] = useState<"watchlist" | "applications">("applications");
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
@@ -105,74 +95,6 @@ function Dashboard() {
       }),
     [allJobs, get, rolesByJob],
   );
-
-  useEffect(() => {
-    if (!hydrated || applicationsMigrated) return;
-    const migratable = new Set<AppStatus>(["applied", "interview", "interviewed", "offer", "rejected", "rejected-after-interview"]);
-    const statusFor = (status: AppStatus): ApplicationStatus => {
-      if (status === "interview") return "interviewing";
-      if (status === "interviewed" || status === "rejected-after-interview") return status === "interviewed" ? "interviewed" : "rejected";
-      if (status === "offer") return "offer";
-      if (status === "rejected") return "rejected";
-      return "applied";
-    };
-    const records: Application[] = [];
-    const converted: string[] = [];
-    const seen = new Set<string>();
-    for (const job of enriched) {
-      const candidates = job.roleStates.length > 0
-        ? job.roleStates.map(({ role, state }) => ({ sourceKey: roleKey(job.id, role.id), role: role.title, state }))
-        : [{ sourceKey: job.id, role: job.roles, state: job.state }];
-      for (const candidate of candidates) {
-        if (!migratable.has(candidate.state.status) || seen.has(candidate.sourceKey)) continue;
-        seen.add(candidate.sourceKey);
-        converted.push(job.id);
-        records.push({
-          id: `migrated-${candidate.sourceKey}`,
-          sourceKey: candidate.sourceKey,
-          company: job.company,
-          role: candidate.role,
-          requirementId: "",
-          dateApplied: candidate.state.appliedOn ?? "",
-          deadline: candidate.state.closesOn ?? "",
-          status: statusFor(candidate.state.status),
-          interviewed: ["interviewed", "offer", "rejected-after-interview"].includes(candidate.state.status),
-          resumeFileName: candidate.state.resumeFile?.name ?? "",
-          resumeVersion: "",
-          contact: "",
-          lastFollowUpDate: "",
-          eligibility: "",
-          notes: candidate.state.notes ?? job.notes,
-          responseDate: "",
-          interviewLog: { questionsAsked: "", wentWell: "", changeNextTime: "" },
-        });
-      }
-    }
-    completeApplicationMigration(records, converted);
-  }, [applicationsMigrated, completeApplicationMigration, enriched, hydrated]);
-
-
-  const convertToApplication = (job: EnrichedJob) => {
-    addApplication({
-      sourceKey: job.id,
-      company: job.company,
-      role: job.roles.split(/,|\//)[0]?.trim() ?? "",
-      requirementId: "",
-      dateApplied: new Date().toISOString().slice(0, 10),
-      deadline: job.state.closesOn ?? "",
-      status: "applied",
-      interviewed: false,
-      resumeFileName: job.state.resumeFile?.name ?? "",
-      contact: "",
-      lastFollowUpDate: "",
-      eligibility: "",
-      notes: job.state.notes ?? job.notes,
-      responseDate: "",
-      interviewLog: { questionsAsked: "", wentWell: "", changeNextTime: "" },
-    });
-    completeApplicationMigration(applications, [job.id]);
-    setView("applications");
-  };
 
   const groups = useMemo(() => {
     const s = new Set(enriched.map((j) => j.group));
@@ -204,27 +126,9 @@ function Dashboard() {
     });
   }, [enriched, query, statusFilter, groupFilter, countryFilter, resumeFilter]);
 
-  const watchlist = useMemo(() => {
-    const converted = new Set(convertedCompanyIds);
-    const byCompany = new Map<string, EnrichedJob>();
-    for (const job of filtered) {
-      if (converted.has(job.id)) continue;
-      const key = job.company.trim().toLowerCase();
-      if (!byCompany.has(key)) byCompany.set(key, job);
-    }
-    return Array.from(byCompany.values());
-  }, [convertedCompanyIds, filtered]);
-
   const stats = useMemo(() => {
     const counts: Record<AppStatus, number> = {
-      "not-started": 0,
-      researching: 0,
-      applied: 0,
-      interview: 0,
-      interviewed: 0,
-      offer: 0,
-      "rejected-after-interview": 0,
-      rejected: 0,
+      "not-started": 0, researching: 0, applied: 0, interview: 0, offer: 0, rejected: 0,
     };
     let resumes = 0;
     for (const j of enriched) {
@@ -236,10 +140,8 @@ function Dashboard() {
       }
     }
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
-    const appliedCount = counts.applied + counts.interview + counts.offer + counts["rejected-after-interview"] + counts.rejected;
-    const interviewedCount = counts.interviewed + counts.offer + counts["rejected-after-interview"];
-    const rejectionCount = counts.rejected + counts["rejected-after-interview"];
-    return { total: totalTracked, counts, resumes, appliedCount, interviewedCount, rejectionCount };
+    const appliedCount = counts.applied + counts.interview + counts.offer;
+    return { total: totalTracked, counts, resumes, appliedCount };
   }, [enriched]);
 
   const exportCsv = () => {
@@ -285,7 +187,7 @@ function Dashboard() {
         ? j.roleStates.map((rs) => ({ title: `${j.company} — ${rs.role.title}`, state: rs.state }))
         : [{ title: j.company, state: j.state }];
       for (const t of targets) {
-        if (["applied", "interview", "interviewed", "offer", "rejected", "rejected-after-interview"].includes(t.state.status)) continue;
+        if (t.state.status === "applied" || t.state.status === "interview" || t.state.status === "offer") continue;
         if (t.state.closesOn && t.state.closesOn >= fmt(today) && t.state.closesOn <= fmt(soon)) closingCount++;
         if (!suggestion && t.state.status === "not-started") suggestion = t.title;
       }
@@ -328,14 +230,7 @@ function Dashboard() {
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-        <section className="flex gap-2 border-b border-border pb-3">
-          <Button variant={view === "applications" ? "default" : "secondary"} onClick={() => setView("applications")}>Applications ({applications.length})</Button>
-          <Button variant={view === "watchlist" ? "default" : "secondary"} onClick={() => setView("watchlist")}>Watchlist ({watchlist.length})</Button>
-        </section>
-
-        {view === "applications" ? (
-          <ApplicationsSection applications={applications} weeklyGoal={weeklyGoal} onWeeklyGoalChange={setWeeklyGoal} onUpdate={updateApplication} />
-        ) : <>
+        <ProgressHero stats={stats} urgent={urgent} nextUp={nextUp} />
 
         {/* Filters */}
         <section className="flex flex-wrap gap-3 items-center">
@@ -345,7 +240,7 @@ function Dashboard() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search company, role, country, notes…"
-              className="pl-9 h-11 rounded-lg bg-card border-border"
+              className="pl-9 h-11 rounded-xl bg-card/60 border-border/60"
             />
           </div>
            <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -358,7 +253,7 @@ function Dashboard() {
              </SelectContent>
            </Select>
           <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[170px]">
+            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[170px]">
               <Globe className="h-4 w-4 mr-1 opacity-60" />
               <SelectValue />
             </SelectTrigger>
@@ -370,7 +265,7 @@ function Dashboard() {
             </SelectContent>
           </Select>
           <Select value={groupFilter} onValueChange={setGroupFilter}>
-            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[200px]">
+            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[200px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -381,7 +276,7 @@ function Dashboard() {
             </SelectContent>
           </Select>
           <Select value={resumeFilter} onValueChange={setResumeFilter}>
-            <SelectTrigger className="h-11 rounded-lg bg-card border-border w-[180px]">
+            <SelectTrigger className="h-11 rounded-xl bg-card/60 border-border/60 w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -394,11 +289,11 @@ function Dashboard() {
 
          <section>
            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Watchlist</h2>
-             <span className="text-sm text-muted-foreground">{watchlist.length} companies</span>
+             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Companies A to Z</h2>
+             <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
            </div>
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-fr">
-              {[...watchlist]
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {[...filtered]
                 .sort((a, b) => a.company.localeCompare(b.company))
                 .map((j) => (
                   <JobCard
@@ -412,18 +307,15 @@ function Dashboard() {
                     roles={rolesOf(j.id)}
                     addRole={addRole}
                     removeRole={removeRole}
-                    watchlist
-                    onConvert={() => convertToApplication(j)}
                   />
                 ))}
            </div>
-           {watchlist.length === 0 && (
+          {filtered.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
               No matches. Adjust your filters or add a new job. 💌
             </div>
           )}
         </section>
-        </>}
 
         <footer className="text-center text-xs text-muted-foreground pt-8 pb-4">
            Your information stays in this browser. Export a spreadsheet backup anytime.
@@ -441,8 +333,6 @@ type Stats = {
   counts: Record<AppStatus, number>;
   resumes: number;
   appliedCount: number;
-  interviewedCount: number;
-  rejectionCount: number;
 };
 
 const PEP_TALKS = [
@@ -472,52 +362,78 @@ function ProgressHero({ stats, urgent, nextUp }: { stats: Stats; urgent: number;
   const appsToMilestone =
     nextMilestone != null ? Math.max(1, Math.ceil((nextMilestone / 100) * stats.total) - stats.appliedCount) : 0;
   const pep = PEP_TALKS[new Date().getDate() % PEP_TALKS.length];
+  const chips: { label: string; count: number; color: string }[] = [
+    { label: "Applied", count: stats.counts.applied, color: STATUS_META.applied.color },
+    { label: "Interview", count: stats.counts.interview, color: STATUS_META.interview.color },
+    { label: "Offer", count: stats.counts.offer, color: STATUS_META.offer.color },
+    { label: "Resumes ready", count: stats.resumes, color: "var(--success)" },
+  ];
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Application momentum">
-      <div className="col-span-2 lg:row-span-2 rounded-lg bg-primary text-primary-foreground p-5 sm:p-6 relative overflow-hidden min-h-52 flex flex-col justify-between shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase">Application momentum</p>
-            <p className="text-2xl sm:text-3xl mt-2 leading-tight max-w-md" data-display>{motivationFor(pct, stats.appliedCount)}</p>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-5xl sm:text-6xl leading-none" data-display>{pct}%</p>
-            <p className="text-xs mt-1 opacity-80">{stats.appliedCount} of {stats.total} sent</p>
-          </div>
+    <section className="rounded-2xl border border-border/60 bg-card/70 card-shadow p-4 sm:p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="space-y-0.5">
+          <p className="font-bold text-sm sm:text-base">{motivationFor(pct, stats.appliedCount)}</p>
+          <p className="text-xs text-muted-foreground">{pep}</p>
         </div>
-        <div>
-          <div className="h-2 bg-primary-foreground/25 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Applications sent">
-            <div className="h-full bg-primary-foreground transition-[width] duration-700" style={{ width: `${Math.max(pct, stats.appliedCount > 0 ? 3 : 0)}%` }} />
-          </div>
-          <p className="text-xs mt-3 opacity-85">{pep}</p>
+        <div className="text-right shrink-0">
+          <p className="text-3xl sm:text-4xl font-black text-gradient leading-none">{pct}%</p>
+          <p className="text-xs text-muted-foreground">
+            {stats.appliedCount} of {stats.total} sent
+          </p>
         </div>
       </div>
-      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
-        <p className="text-xs font-bold uppercase text-muted-foreground">Interviewing</p>
-        <p className="text-3xl mt-1" data-display>{stats.counts.interview}</p>
-        <p className="text-xs text-muted-foreground mt-1">Conversations in motion</p>
+      <div
+        className="h-4 rounded-full bg-muted overflow-hidden"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Applications sent"
+      >
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${Math.max(pct, stats.appliedCount > 0 ? 3 : 0)}%`,
+            background:
+              "linear-gradient(90deg, var(--primary), var(--accent), var(--info), var(--success))",
+          }}
+        />
       </div>
-      <div className="rounded-lg bg-secondary text-secondary-foreground p-4 min-h-24">
-        <p className="text-xs font-bold uppercase">Interviewed</p>
-        <p className="text-3xl mt-1" data-display>{stats.interviewedCount}</p>
-        <p className="text-xs mt-1 opacity-75">You earned every one</p>
+      <div className="flex flex-wrap gap-2">
+        {chips.map((c) => (
+          <span
+            key={c.label}
+            className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{ background: `color-mix(in oklab, ${c.color} 35%, transparent)` }}
+          >
+            {c.label}: {c.count}
+          </span>
+        ))}
+        <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-muted text-muted-foreground">
+          Resume coverage {resumePct}%
+        </span>
+        {nextMilestone != null && stats.appliedCount > 0 && (
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{ background: "color-mix(in oklab, var(--accent) 35%, transparent)" }}
+          >
+            🎯 {appsToMilestone} more to hit {nextMilestone}%
+          </span>
+        )}
+        {urgent > 0 && (
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-semibold"
+            style={{ background: "color-mix(in oklab, var(--warning) 55%, transparent)" }}
+          >
+            ⏰ {urgent} deadline{urgent === 1 ? "" : "s"} closing this week — go go go!
+          </span>
+        )}
       </div>
-      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
-        <p className="text-xs font-bold uppercase text-muted-foreground">Rejected</p>
-        <p className="text-3xl mt-1" data-display>{stats.rejectionCount}</p>
-        <p className="text-xs text-muted-foreground mt-1">Outcome, not your worth</p>
-      </div>
-      <div className="rounded-lg border border-border bg-card p-4 min-h-24">
-        <p className="text-xs font-bold uppercase text-muted-foreground">Resume coverage</p>
-        <p className="text-3xl mt-1" data-display>{resumePct}%</p>
-        <p className="text-xs text-muted-foreground mt-1">{stats.resumes} ready to send</p>
-      </div>
-      <div className="col-span-2 lg:col-span-4 grid sm:grid-cols-3 border border-border bg-card rounded-lg overflow-hidden text-xs">
-        <p className="p-3 border-b sm:border-b-0 sm:border-r border-border"><strong>Next mark:</strong> {nextMilestone != null ? `${appsToMilestone} more to reach ${nextMilestone}%` : "Every target reached"}</p>
-        <p className="p-3 border-b sm:border-b-0 sm:border-r border-border"><strong>Deadlines:</strong> {urgent > 0 ? `${urgent} closing this week` : "Nothing urgent this week"}</p>
-        <p className="p-3"><strong>Next move:</strong> {nextUp ?? "Review your active applications"}</p>
-      </div>
-      <p className="col-span-2 lg:col-span-4 text-xs text-muted-foreground">“Interviewed + Rejected” counts once as an application, once under Interviewed, and once under Rejected.</p>
+      {nextUp && stats.appliedCount < stats.total && (
+        <p className="text-xs text-muted-foreground">
+          💡 Next up idea: <span className="font-semibold text-foreground">{nextUp}</span> is still waiting on you
+        </p>
+      )}
     </section>
   );
 }
@@ -539,8 +455,6 @@ function JobCard({
   roles,
   addRole,
   removeRole,
-  watchlist,
-  onConvert,
 }: {
   job: EnrichedJob;
   state: JobState;
@@ -551,8 +465,6 @@ function JobCard({
   roles: Role[];
   addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
   removeRole: (jobId: string, roleId: string) => void;
-  watchlist?: boolean;
-  onConvert?: () => void;
 }) {
   const meta = STATUS_META[state.status];
   const initials = job.company.slice(0, 2).toUpperCase();
@@ -593,11 +505,6 @@ function JobCard({
             </p>
           </div>
         </div>
-        {watchlist && onConvert && (
-          <Button size="sm" className="mt-3 w-full" onClick={(e) => { e.stopPropagation(); onConvert(); }}>
-            Convert to application 💌
-          </Button>
-        )}
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Badge
