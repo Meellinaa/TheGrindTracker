@@ -140,16 +140,30 @@ export const JOBS: Job[] = raw.map((j) => ({
   id: j.company.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
 }));
 
-export type AppStatus = "not-started" | "researching" | "applied" | "interview" | "offer" | "rejected";
+export type AppStatus =
+  | "not-started"
+  | "researching"
+  | "applied"
+  | "interview"
+  | "interviewed"
+  | "offer"
+  | "rejected"
+  | "rejected-after-interview";
 
 export const STATUS_META: Record<AppStatus, { label: string; color: string; emoji: string }> = {
   "not-started": { label: "Not Started", color: "oklch(0.78 0.03 320)", emoji: "🤍" },
   researching: { label: "Researching", color: "oklch(0.85 0.11 85)", emoji: "🔍" },
   applied: { label: "Applied", color: "oklch(0.82 0.09 230)", emoji: "💌" },
-  interview: { label: "Interview", color: "oklch(0.82 0.1 300)", emoji: "💬" },
+  interview: { label: "Interviewing", color: "oklch(0.82 0.1 300)", emoji: "💬" },
+  interviewed: { label: "Interviewed", color: "oklch(0.8 0.1 270)", emoji: "🌟" },
   offer: { label: "Offer", color: "oklch(0.82 0.11 155)", emoji: "🎀" },
   rejected: { label: "Rejected", color: "oklch(0.78 0.1 25)", emoji: "🥀" },
+  "rejected-after-interview": { label: "Interviewed, then closed", color: "oklch(0.8 0.08 10)", emoji: "🏅" },
 };
+
+/** Any saved status we don't recognise falls back to Not Started instead of crashing the page. */
+export const safeStatus = (s: unknown): AppStatus =>
+  typeof s === "string" && s in STATUS_META ? (s as AppStatus) : "not-started";
 
 export const CATEGORY_GROUPS: Record<string, string> = {
   "Big Tech": "🏢 Big Tech",

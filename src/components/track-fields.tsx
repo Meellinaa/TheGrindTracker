@@ -11,8 +11,10 @@ export const STATUSES: AppStatus[] = [
   "researching",
   "applied",
   "interview",
+  "interviewed",
   "offer",
   "rejected",
+  "rejected-after-interview",
 ];
 
 export function StatusButtons({
