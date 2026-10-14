@@ -30,6 +30,29 @@ export type Role = {
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
 const ROLES_KEY = "job-tracker-roles-v1";
+const V2_APPLICATIONS_KEY = "job-tracker-applications-v2";
+const V2_RESTORED_KEY = "job-tracker-v2-restored-v1";
+
+/** Map the short-lived v2 statuses back onto the classic statuses. */
+const v2StatusToV1: Record<string, AppStatus> = {
+  applied: "applied",
+  screen: "applied",
+  interviewing: "interview",
+  interviewed: "interviewed",
+  "final-round": "interview",
+  offer: "offer",
+  rejected: "rejected",
+};
+
+type V2Application = {
+  sourceKey?: string;
+  role?: string;
+  dateApplied?: string;
+  deadline?: string;
+  status?: string;
+  resumeFileName?: string;
+  notes?: string;
+};
 
 /** Storage key for a role's own tracking state (reuses the same JobState shape). */
 export const roleKey = (jobId: string, roleId: string) => `${jobId}::${roleId}`;
@@ -74,6 +97,33 @@ export function useJobTracker() {
       if (rawC) setCustomJobs(JSON.parse(rawC));
       const rawR = localStorage.getItem(ROLES_KEY);
       if (rawR) setRolesByJob(JSON.parse(rawR));
+      // One-time recovery: pull anything saved during the v2 split-view period
+      // back into the classic map, without overwriting existing entries.
+      if (localStorage.getItem(V2_RESTORED_KEY) !== "true") {
+        const rawA = localStorage.getItem(V2_APPLICATIONS_KEY);
+        if (rawA) {
+          const apps: V2Application[] = JSON.parse(rawA);
+          setMap((prev) => {
+            const next = { ...prev };
+            for (const app of apps) {
+              if (!app.sourceKey) continue;
+              const existing = next[app.sourceKey];
+              if (existing && existing.status !== "not-started") continue;
+              const status = v2StatusToV1[app.status ?? ""] ?? "applied";
+              next[app.sourceKey] = {
+                ...(existing ?? defaultState),
+                status,
+                resumeReady: existing?.resumeReady ?? !!app.resumeFileName,
+                appliedOn: existing?.appliedOn ?? app.dateApplied,
+                closesOn: existing?.closesOn ?? (app.deadline || undefined),
+                notes: existing?.notes ?? (app.notes || undefined),
+              };
+            }
+            return next;
+          });
+        }
+        localStorage.setItem(V2_RESTORED_KEY, "true");
+      }
     } catch {}
     setHydrated(true);
   }, []);
