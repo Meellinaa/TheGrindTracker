@@ -30,6 +30,29 @@ export type Role = {
 const KEY = "job-tracker-v1";
 const CUSTOM_KEY = "job-tracker-custom-v1";
 const ROLES_KEY = "job-tracker-roles-v1";
+const V2_APPLICATIONS_KEY = "job-tracker-applications-v2";
+const V2_RESTORED_KEY = "job-tracker-v2-restored-v1";
+
+/** Map the short-lived v2 statuses back onto the classic statuses. */
+const v2StatusToV1: Record<string, AppStatus> = {
+  applied: "applied",
+  screen: "applied",
+  interviewing: "interview",
+  interviewed: "interviewed",
+  "final-round": "interview",
+  offer: "offer",
+  rejected: "rejected",
+};
+
+type V2Application = {
+  sourceKey?: string;
+  role?: string;
+  dateApplied?: string;
+  deadline?: string;
+  status?: string;
+  resumeFileName?: string;
+  notes?: string;
+};
 
 /** Storage key for a role's own tracking state (reuses the same JobState shape). */
 export const roleKey = (jobId: string, roleId: string) => `${jobId}::${roleId}`;
