@@ -142,7 +142,7 @@ function Dashboard() {
     }
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
     const appliedCount =
-      counts.applied + counts.interview + counts.interviewed + counts.offer + counts["rejected-after-interview"];
+      counts.applied + counts.interview + counts.interviewed + counts.offer + counts.rejected + counts["rejected-after-interview"];
     return { total: totalTracked, counts, resumes, appliedCount };
   }, [enriched]);
 
