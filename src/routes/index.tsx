@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { JOBS, STATUS_META, groupOf, type AppStatus, type Job } from "@/data/jobs";
+import { JOBS, STATUS_META, groupOf, PASSED_STATUSES, type AppStatus, type Job } from "@/data/jobs";
 import { useJobTracker, roleKey, type JobState, type Role } from "@/hooks/use-job-tracker";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,8 @@ function Dashboard() {
   const [resumeFilter, setResumeFilter] = useState<string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "interviews">("all");
+
 
   const allJobs = useMemo<Job[]>(() => [...customJobs, ...JOBS], [customJobs]);
 
@@ -114,6 +116,8 @@ function Dashboard() {
       if (countryFilter !== "all" && (j.country ?? "Canada") !== countryFilter) return false;
       if (resumeFilter === "ready" && !j.state.resumeReady) return false;
       if (resumeFilter === "missing" && j.state.resumeReady) return false;
+      if (tab === "interviews" && !hasPassed(j)) return false;
+
       if (!q) return true;
       return (
         j.company.toLowerCase().includes(q) ||
@@ -124,7 +128,7 @@ function Dashboard() {
         j.notes.toLowerCase().includes(q)
       );
     });
-  }, [enriched, query, statusFilter, groupFilter, countryFilter, resumeFilter]);
+  }, [enriched, query, statusFilter, groupFilter, countryFilter, resumeFilter, tab]);
 
   const stats = useMemo(() => {
     const counts: Record<AppStatus, number> = {
@@ -143,7 +147,9 @@ function Dashboard() {
     const totalTracked = enriched.length + enriched.reduce((n, j) => n + j.roleStates.length, 0);
     const appliedCount =
       counts.applied + counts.interview + counts.interviewed + counts.offer + counts.rejected + counts["rejected-after-interview"];
-    return { total: totalTracked, counts, resumes, appliedCount };
+    const passedCount = PASSED_STATUSES.reduce((n, s) => n + counts[s], 0);
+    return { total: totalTracked, counts, resumes, appliedCount, passedCount };
+
   }, [enriched]);
 
   const exportCsv = () => {
@@ -290,10 +296,57 @@ function Dashboard() {
         </section>
 
          <section>
-           <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-             <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="h-5 w-5" /> Companies A to Z</h2>
+           <div className="flex items-center justify-between border-b border-border pb-3 mb-4 gap-3 flex-wrap">
+             <div className="flex items-center gap-2 flex-wrap">
+               <button
+                 onClick={() => setTab("all")}
+                 className={`text-sm font-bold px-3 py-2 rounded-lg border transition-all ${
+                   tab === "all"
+                     ? "gradient-hero text-primary-foreground border-0"
+                     : "border-border bg-card/60 hover:border-primary/60"
+                 }`}
+               >
+                 <span className="flex items-center gap-1.5">
+                   <Building2 className="h-4 w-4" /> All companies ({stats.total})
+                 </span>
+               </button>
+               <button
+                 onClick={() => setTab("interviews")}
+                 className={`text-sm font-bold px-3 py-2 rounded-lg border transition-all ${
+                   tab === "interviews"
+                     ? "gradient-hero text-primary-foreground border-0"
+                     : "border-border bg-card/60 hover:border-primary/60"
+                 }`}
+               >
+                 ⭐ Interviews &amp; replies ({stats.passedCount})
+               </button>
+             </div>
              <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
            </div>
+           {tab === "interviews" && (
+             <div className="rounded-2xl border border-border/60 bg-card/70 card-shadow p-4 mb-4 space-y-2">
+               <p className="font-bold text-sm sm:text-base">
+                 🎉 {stats.passedCount} role{stats.passedCount === 1 ? "" : "s"} got past the application stage
+               </p>
+               <p className="text-xs text-muted-foreground">
+                 {stats.appliedCount > 0
+                   ? `${Math.round((stats.passedCount / stats.appliedCount) * 100)}% of everything you sent turned into a reply — that's real progress 💖`
+                   : "Nothing sent yet — your first reply is closer than you think 🌱"}
+               </p>
+               <div className="flex flex-wrap gap-2">
+                 {PASSED_STATUSES.map((s) => (
+                   <span
+                     key={s}
+                     className="text-xs px-2.5 py-1 rounded-full font-medium"
+                     style={{ background: `color-mix(in oklab, ${STATUS_META[s].color} 35%, transparent)` }}
+                   >
+                     {STATUS_META[s].emoji} {STATUS_META[s].label}: {stats.counts[s]}
+                   </span>
+                 ))}
+               </div>
+             </div>
+           )}
+
            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {[...filtered]
                 .sort((a, b) => a.company.localeCompare(b.company))
@@ -309,6 +362,8 @@ function Dashboard() {
                     roles={rolesOf(j.id)}
                     addRole={addRole}
                     removeRole={removeRole}
+                    passedOnly={tab === "interviews"}
+
                   />
                 ))}
            </div>
@@ -335,7 +390,13 @@ type Stats = {
   counts: Record<AppStatus, number>;
   resumes: number;
   appliedCount: number;
+  passedCount: number;
 };
+
+/** A company counts for the interview tab when it or any of its roles got a reply. */
+const hasPassed = (j: { state: JobState; roleStates: { role: Role; state: JobState }[] }) =>
+  PASSED_STATUSES.includes(j.state.status) || j.roleStates.some((rs) => PASSED_STATUSES.includes(rs.state.status));
+
 
 const PEP_TALKS = [
   "Rejection is redirection — every 'no' is one step closer to your 'yes' 💌",
@@ -457,6 +518,8 @@ function JobCard({
   roles,
   addRole,
   removeRole,
+  passedOnly,
+
 }: {
   job: EnrichedJob;
   state: JobState;
@@ -467,10 +530,16 @@ function JobCard({
   roles: Role[];
   addRole: (jobId: string, role: { title: string; link?: string; location?: string }) => string;
   removeRole: (jobId: string, roleId: string) => void;
+  passedOnly?: boolean;
+
 }) {
   const meta = STATUS_META[state.status];
   const initials = job.company.slice(0, 2).toUpperCase();
   const suggested = job.roles.split(/,|\//).map((s) => s.trim()).filter(Boolean);
+  const shownRoles = passedOnly
+    ? roles.filter((r) => PASSED_STATUSES.includes(get(roleKey(job.id, r.id)).status))
+    : roles;
+
 
   return (
     <Dialog>
@@ -538,9 +607,9 @@ function JobCard({
           </Badge>
         </div>
 
-        {roles.length > 0 ? (
+        {shownRoles.length > 0 ? (
           <div className="mt-3 space-y-1">
-            {roles.slice(0, 3).map((r) => {
+            {shownRoles.slice(0, 3).map((r) => {
               const rs = get(roleKey(job.id, r.id));
               return (
                 <div key={r.id} className="flex items-center gap-2 text-xs">
@@ -550,10 +619,11 @@ function JobCard({
                 </div>
               );
             })}
-            {roles.length > 3 && (
-              <p className="text-xs text-muted-foreground">+{roles.length - 3} more roles</p>
+            {shownRoles.length > 3 && (
+              <p className="text-xs text-muted-foreground">+{shownRoles.length - 3} more roles</p>
             )}
           </div>
+
         ) : (
           <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{job.notes}</p>
         )}

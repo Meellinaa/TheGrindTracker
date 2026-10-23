@@ -165,6 +165,10 @@ export const STATUS_META: Record<AppStatus, { label: string; color: string; emoj
 export const safeStatus = (s: unknown): AppStatus =>
   typeof s === "string" && s in STATUS_META ? (s as AppStatus) : "not-started";
 
+/** Statuses where the application got past the resume screen — a reply of any kind. */
+export const PASSED_STATUSES: AppStatus[] = ["interview", "interviewed", "offer", "rejected-after-interview"];
+
+
 export const CATEGORY_GROUPS: Record<string, string> = {
   "Big Tech": "🏢 Big Tech",
   "Big Tech/Fintech": "🏢 Big Tech",
