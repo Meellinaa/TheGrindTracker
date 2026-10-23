@@ -302,9 +302,15 @@ function Dashboard() {
                  onClick={() => setTab("all")}
                  className={`text-sm font-bold px-3 py-2 rounded-lg border transition-all ${
                    tab === "all"
-                     ? "gradient-hero text-primary-foreground border-0"
+                     ? "text-primary-foreground border-transparent"
                      : "border-border bg-card/60 hover:border-primary/60"
                  }`}
+                 style={
+                   tab === "all"
+                     ? { background: "linear-gradient(90deg, var(--primary), var(--accent))" }
+                     : undefined
+                 }
+
                >
                  <span className="flex items-center gap-1.5">
                    <Building2 className="h-4 w-4" /> All companies ({stats.total})
@@ -314,9 +320,15 @@ function Dashboard() {
                  onClick={() => setTab("interviews")}
                  className={`text-sm font-bold px-3 py-2 rounded-lg border transition-all ${
                    tab === "interviews"
-                     ? "gradient-hero text-primary-foreground border-0"
+                     ? "text-primary-foreground border-transparent"
                      : "border-border bg-card/60 hover:border-primary/60"
                  }`}
+                 style={
+                   tab === "interviews"
+                     ? { background: "linear-gradient(90deg, var(--primary), var(--accent))" }
+                     : undefined
+                 }
+
                >
                  ⭐ Interviews &amp; replies ({stats.passedCount})
                </button>
